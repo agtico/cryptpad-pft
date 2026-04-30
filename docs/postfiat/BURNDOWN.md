@@ -16,7 +16,7 @@ Status values:
 - [x] Capture architecture recommendation.
 - [x] Capture implementation burndown and handoff notes.
 - [x] Create GitHub repo under `agtico`.
-- [ ] Push initial fork and docs.
+- [x] Push initial fork and docs.
 
 ## Phase 1: Wallet Core
 
