@@ -107,6 +107,8 @@ define([
         var $walletMnemonic = $('#pft-mnemonic');
         var $walletPassword = $('#pft-wallet-password');
         var $savePassword = $('#pft-save-password');
+        var $savePasswordContainer = $('#pft-save-password-container');
+        var $saveWallet = $('#pft-save-wallet');
         var $savedWallet = $('#pft-saved-wallet');
         var $savedWalletAddress = $('#pft-saved-wallet-address');
         var getWalletCore = function (quiet) {
@@ -134,6 +136,14 @@ define([
                 $savedWallet.addClass('cp-hidden');
             }
         };
+        var refreshSavePassword = function () {
+            if ($saveWallet[0].checked) {
+                $savePasswordContainer.removeClass('cp-hidden');
+            } else {
+                $savePasswordContainer.addClass('cp-hidden');
+                $savePassword.val('');
+            }
+        };
         var loginWithMnemonic = function (Core, mnemonic, shouldImport) {
             var wallet = Core.deriveWalletFromMnemonic(mnemonic);
             var message = WalletAuth.getLoginMessage(wallet.address);
@@ -158,7 +168,7 @@ define([
 
             var mnemonic = $walletMnemonic.val();
             try {
-                if ($('#pft-save-wallet')[0].checked) {
+                if ($saveWallet[0].checked) {
                     var savePassword = $savePassword.val();
                     if (!savePassword) {
                         return void UI.warn('Enter a wallet password before saving.');
@@ -190,6 +200,8 @@ define([
             }
         };
         refreshSavedWallet();
+        refreshSavePassword();
+        $saveWallet.on('change', refreshSavePassword);
         $('#pft-wallet-login').click(walletLogin);
         $('#pft-unlock-wallet').click(savedWalletLogin);
         $('#pft-forget-wallet').click(function () {

@@ -70,15 +70,16 @@ define([
                             h('div#pft-saved-wallet.cp-hidden', [
                                 h('div.big-container', [
                                     h('div.input-container', [
-                                        h('label.cp-default-label', { for: 'pft-wallet-password' }, 'Wallet password'),
+                                        h('label.cp-default-label', { for: 'pft-wallet-password' }, 'Wallet unlock password'),
                                         h('input.form-control#pft-wallet-password', {
                                             type: 'password',
                                             name: 'pft-wallet-password',
                                             autocomplete: 'current-password',
+                                            placeholder: 'Wallet unlock password',
                                         }),
                                     ]),
                                     h('div.input-container', [
-                                        h('label.cp-default-label', 'Saved wallet'),
+                                        h('label.cp-default-label', 'Saved wallet address'),
                                         h('div#pft-saved-wallet-address.form-control', {
                                             tabindex: 0,
                                         }),
@@ -105,12 +106,13 @@ define([
                                         rows: 3,
                                     }),
                                 ]),
-                                h('div.input-container', [
-                                    h('label.cp-default-label', { for: 'pft-save-password' }, 'New wallet password'),
+                                h('div#pft-save-password-container.input-container.cp-hidden', [
+                                    h('label.cp-default-label', { for: 'pft-save-password' }, 'Create wallet unlock password'),
                                     h('input.form-control#pft-save-password', {
                                         type: 'password',
                                         name: 'pft-save-password',
                                         autocomplete: 'new-password',
+                                        placeholder: 'Create wallet unlock password',
                                     }),
                                 ]),
                             ]),
