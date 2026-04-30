@@ -171,14 +171,22 @@
     }
 
     .cp-share-pft {
+        width: 78vw;
+        max-width: 620px;
         .cp-hidden {
             display: none !important;
         }
         .cp-default-label {
-            margin-bottom: 4px;
+            margin-bottom: 6px;
             color: @cryptpad_color_grey_700;
             font-size: @colortheme_app-font-size-small;
-            font-weight: 600;
+            font-weight: 700;
+        }
+        input.form-control,
+        textarea.form-control {
+            border-radius: 8px;
+            border-color: @cryptpad_color_grey_300;
+            box-shadow: none;
         }
         textarea.form-control {
             min-height: 76px;
@@ -188,7 +196,7 @@
             line-height: 1.35;
         }
         #cp-share-pft-recipient {
-            min-height: 54px;
+            min-height: 42px;
         }
         #cp-share-pft-relays {
             min-height: 46px;
@@ -201,39 +209,45 @@
         #cp-share-pft-contact {
             max-width: 100%;
         }
-        .cp-share-pft-wallet-summary {
+        .cp-share-pft-session-card {
             display: flex;
             align-items: center;
             flex-wrap: wrap;
             gap: 0.5rem;
             margin-bottom: @variables_padding;
-            .cp-share-pft-switch-wallet {
-                margin-left: auto !important;
-            }
+            padding: 10px 12px;
+            border: 1px solid @cryptpad_color_grey_300;
+            border-radius: 8px;
+            background: fade(@cryptpad_color_grey_100, 55%);
         }
-        .cp-share-pft-unlocked-address,
-        .cp-share-pft-saved-wallet-meta {
+        .cp-share-pft-wallet-summary {
+            color: @cryptpad_color_grey_900;
+            background: fade(@cryptpad_color_blue, 9%);
+        }
+        .cp-share-pft-unlocked-address {
             overflow-wrap: anywhere;
             font-family: monospace;
-        }
-        .cp-share-pft-saved-wallet-meta {
-            margin-bottom: 6px;
+            font-weight: 700;
         }
         .cp-share-pft-wallet-unlock {
-            margin-bottom: @variables_padding;
-            button {
-                margin-left: 0 !important;
-            }
-            .cp-share-pft-saved-wallet {
-                display: grid;
-                grid-template-columns: minmax(0, 1fr) auto;
-                gap: 8px;
-                align-items: end;
-                .cp-default-label,
-                .cp-share-pft-saved-wallet-meta {
-                    grid-column: 1 / -1;
-                }
-            }
+            display: block;
+        }
+        .cp-share-pft-card-title {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+        .cp-share-pft-muted {
+            margin: 0 0 8px;
+            color: @cryptpad_color_grey_700;
+            font-size: @colortheme_app-font-size-small;
+        }
+        .cp-share-pft-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         .cp-share-pft-wallet-status {
             margin-top: 8px;
@@ -241,6 +255,32 @@
         .cp-share-pft-status {
             margin-top: @variables_padding;
             min-height: 20px;
+        }
+        .cp-share-pft-mode {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: @variables_padding;
+        }
+        .cp-share-pft-mode-option {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 36px;
+            margin: 0;
+            padding: 6px 10px;
+            border: 1px solid @cryptpad_color_grey_300;
+            border-radius: 8px;
+            background: white;
+            font-weight: 600;
+        }
+        .cp-share-pft-advanced {
+            margin-top: @variables_padding;
+            summary {
+                cursor: pointer;
+                color: @cryptpad_color_grey_700;
+                font-weight: 700;
+            }
         }
         .btn-group {
             display: flex;
@@ -302,17 +342,16 @@
 
     @media (max-width: @browser_media-medium-screen) {
         .cp-share-pft {
+            min-width: 0;
             textarea.form-control,
             #cp-share-pft-own-directory,
             #cp-share-pft-result {
                 min-height: 64px;
             }
-            .cp-share-pft-wallet-summary,
-            .cp-share-pft-wallet-unlock .cp-share-pft-saved-wallet {
+            .cp-share-pft-session-card {
                 display: block;
             }
-            .cp-share-pft-switch-wallet,
-            .cp-share-pft-unlock-saved {
+            .cp-share-pft-open-app {
                 width: 100%;
                 margin-top: 8px !important;
             }

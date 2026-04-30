@@ -67,7 +67,7 @@ Status values:
 - [x] Add Nostr relay config, including PFT-operated default relays and user/private relay overrides.
 - [x] Package pad capability secrets as a canonical live-pad share payload.
 - [x] Encrypt live-pad share payloads with NIP-44 and wrap/deliver them with NIP-59/NIP-17 style private events.
-- [~] Add "Share to wallet" as the primary share action in the CryptPad share modal.
+- [x] Add "Share to wallet" as the primary share action in the CryptPad share modal.
 - [~] Add "Shared with me" inbox based on encrypted Nostr relay messages, not on-chain pointer scans.
 - [~] Let recipient import/open a received live pad from the private inbox.
 - [x] Add UI-ready workflow helpers that publish and open live-pad private shares from PFT wallet mnemonics.
@@ -107,8 +107,8 @@ Status values:
 - [ ] Open live CryptPad pads inside a Post Fiat editor shell.
 - [ ] Move share/account controls out of CryptPad editor modals where feasible.
 - [ ] Add editor side panels for Share, Chat, Info, and History.
-- [~] Replace Access rights/Post Fiat tab with a dedicated `Share to wallet` sheet.
-- [~] Hide raw Nostr pubkey and inbox JSON inputs behind advanced controls.
+- [x] Replace the Access rights prompt in the PFT share tab with a dedicated `Share to wallet` sheet.
+- [x] Hide raw Nostr pubkey and inbox JSON inputs behind advanced controls.
 - [ ] Keep raw CryptPad link copy available as an advanced/legacy action.
 - [~] Add wallet account panel, relay/network state, key publication state, and local vault state.
 - [~] Add wallet contacts/address book.
@@ -159,5 +159,5 @@ Status values:
 2. Add saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery browser coverage.
 3. Add browser-level integration tests against a local or fake Nostr relay for share publish, inbox refresh, open, and save.
 4. Add browser e2e coverage for wallet-directory publish/fetch and share-by-wallet-address.
-5. Improve the first-pass Post Fiat share/inbox UI styling and mobile layout.
+5. Add committed browser screenshot coverage for the editor `Share to wallet` modal.
 6. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.

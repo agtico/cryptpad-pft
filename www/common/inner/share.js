@@ -415,8 +415,16 @@ define([
     };
 
     var getPostFiatShareMode = function (opts) {
+        var selected = $('input[name="cp-share-pft-mode"]:checked').val();
+        if (selected === 'view' || selected === 'edit') { return selected; }
         if (!opts.$rights) { return 'edit'; }
         return Util.isChecked(opts.$rights.find('#cp-share-editable-true')) ? 'edit' : 'view';
+    };
+
+    var shortPostFiatAddress = function (address) {
+        var text = String(address || '');
+        if (text.length <= 18) { return text; }
+        return text.slice(0, 9) + '...' + text.slice(-6);
     };
 
     var getPostFiatWalletCore = function () {
@@ -478,12 +486,11 @@ define([
         if (!Core || typeof(Core.restoreSessionWallet) !== 'function') {
             throw new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE');
         }
-        var session = await Core.restoreSessionWallet();
+        var session = await requestOuterPostFiatSessionWallet(common);
+        if (session) { return session; }
+        session = await Core.restoreSessionWallet();
         if (!session && typeof(Core.requestSessionWallet) === 'function') {
             session = await Core.requestSessionWallet({ timeoutMs: 1200 });
-        }
-        if (!session) {
-            session = await requestOuterPostFiatSessionWallet(common);
         }
         if (!session || !session.mnemonic) {
             throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
@@ -498,7 +505,6 @@ define([
         var ShareWorkflow = window.PostFiatPrivateShare;
         var savedContacts = [];
         var activePostFiatSession = null;
-        var walletUnlockAttempt = 0;
         try {
             var WalletCore = getPostFiatWalletCore();
             if (typeof(WalletCore.startSessionWalletResponder) === 'function') {
@@ -508,60 +514,57 @@ define([
             console.error(err);
         }
 
-        var savedWalletAddress = h('span.cp-share-pft-saved-wallet-address');
-        var savedWalletPassword = h('input.form-control#cp-share-pft-saved-wallet-password', {
-            type: 'password',
-            autocomplete: 'current-password',
-            placeholder: 'Wallet password'
-        });
-        var unlockSavedButton = h('button.btn.btn-secondary.cp-share-pft-unlock-saved', {
-            type: 'button'
-        }, [Icons.get('lock'), 'Unlock saved']);
-        var savedWalletUnlock = h('div.cp-share-pft-saved-wallet.cp-hidden', {
-            style: 'display: none;'
-        }, [
-            h('label.cp-default-label', { for: 'cp-share-pft-saved-wallet-password' }, 'Saved wallet password'),
-            h('div.cp-share-pft-saved-wallet-meta', savedWalletAddress),
-            savedWalletPassword,
-            h('div.cp-spacer'),
-            unlockSavedButton
-        ]);
-        var openLoginButton = h('button.btn.btn-secondary.cp-share-pft-open-login', {
-            type: 'button'
-        }, [Icons.get('login'), 'Open wallet login']);
-        var noSavedWallet = h('div.cp-share-pft-no-saved-wallet.cp-hidden', {
-            style: 'display: none;'
-        }, [
-            h('div.cp-default-label', 'No saved wallet found'),
-            h('p', 'Save an encrypted Post Fiat wallet on this browser before sharing.'),
-            h('div.cp-spacer'),
-            openLoginButton
-        ]);
         var walletStatus = h('div.cp-share-pft-wallet-status', { role: 'status' });
-        var walletUnlock = h('div.alert.alert-warning.cp-share-pft-wallet-unlock', [
-            h('div.cp-default-label', 'Wallet unlock'),
-            savedWalletUnlock,
-            noSavedWallet,
-            walletStatus
+        var openAppButton = h('button.btn.btn-secondary.cp-share-pft-open-app', {
+            type: 'button'
+        }, [Icons.get('login'), 'Open Post Fiat Docs']);
+        var walletUnlock = h('div.cp-share-pft-session-card.cp-share-pft-wallet-unlock', [
+            h('div.cp-share-pft-card-title', [Icons.get('lock'), ' Wallet session']),
+            h('p.cp-share-pft-muted',
+                'The document is open, but this tab does not have an unlocked Post Fiat wallet session.'),
+            walletStatus,
+            h('div.cp-share-pft-actions', [openAppButton])
         ]);
         var unlockedAddress = h('span.cp-share-pft-unlocked-address');
-        var switchWalletButton = h('button.btn.btn-secondary.cp-share-pft-switch-wallet', {
-            type: 'button'
-        }, [Icons.get('logout'), 'Use different wallet']);
-        var walletSummary = h('div.alert.alert-primary.cp-share-pft-wallet-summary.cp-hidden', {
+        var walletSummary = h('div.cp-share-pft-session-card.cp-share-pft-wallet-summary.cp-hidden', {
             style: 'display: none;'
         }, [
             Icons.get('access'),
-            h('span', ' Wallet unlocked: '),
-            unlockedAddress,
-            switchWalletButton
+            h('span', ' Wallet '),
+            unlockedAddress
         ]);
         var contactSelect = h('select.form-control#cp-share-pft-contact');
-        var recipientInput = h('textarea.form-control#cp-share-pft-recipient', {
-            rows: 4,
+        var contactWrap = h('div.cp-share-pft-contact-wrap.cp-hidden', {
+            style: 'display: none;'
+        }, [
+            h('label.cp-default-label', { for: 'cp-share-pft-contact' }, 'Saved recipients'),
+            contactSelect,
+            h('div.cp-spacer')
+        ]);
+        var recipientInput = h('input.form-control#cp-share-pft-recipient', {
+            type: 'text',
             spellcheck: false,
-            placeholder: 'Wallet address, saved contact, Nostr pubkey, or inbox JSON'
+            placeholder: 'PFT wallet address'
         });
+        var shareMode = h('div.cp-share-pft-mode', [
+            h('label.cp-share-pft-mode-option', [
+                h('input#cp-share-pft-mode-edit', {
+                    type: 'radio',
+                    name: 'cp-share-pft-mode',
+                    value: 'edit',
+                    checked: true
+                }),
+                h('span', 'Can edit')
+            ]),
+            h('label.cp-share-pft-mode-option', [
+                h('input#cp-share-pft-mode-view', {
+                    type: 'radio',
+                    name: 'cp-share-pft-mode',
+                    value: 'view'
+                }),
+                h('span', 'View only')
+            ])
+        ]);
         var relaysInput = h('textarea.form-control#cp-share-pft-relays', {
             rows: 2,
             spellcheck: false,
@@ -571,7 +574,7 @@ define([
             rows: 4,
             readonly: 'readonly',
             spellcheck: false,
-            placeholder: 'Unlock wallet to load your inbox JSON'
+            placeholder: 'Unlock wallet to load your inbox directory'
         });
         var resultOutput = h('textarea.form-control#cp-share-pft-result', {
             rows: 4,
@@ -579,25 +582,29 @@ define([
             spellcheck: false,
             placeholder: 'Publish result'
         });
+        var advanced = h('details.cp-share-pft-advanced', [
+            h('summary', 'Advanced'),
+            h('div.cp-spacer'),
+            h('label.cp-default-label', { for: 'cp-share-pft-relays' }, 'Relays'),
+            relaysInput,
+            h('div.cp-spacer'),
+            h('label.cp-default-label', { for: 'cp-share-pft-own-directory' }, 'Your inbox directory'),
+            ownDirectory,
+            h('div.cp-spacer'),
+            h('label.cp-default-label', { for: 'cp-share-pft-result' }, 'Publish result'),
+            resultOutput
+        ]);
         var status = h('div.cp-share-pft-status', { role: 'status' });
         var content = h('div.cp-share-modal.cp-share-pft', [
             walletSummary,
             walletUnlock,
             h('div.cp-spacer'),
-            h('label.cp-default-label', { for: 'cp-share-pft-contact' }, 'Saved recipient'),
-            contactSelect,
-            h('div.cp-spacer'),
-            h('label.cp-default-label', { for: 'cp-share-pft-recipient' }, 'Recipient'),
+            contactWrap,
+            h('label.cp-default-label', { for: 'cp-share-pft-recipient' }, 'Share with PFT wallet'),
             recipientInput,
             h('div.cp-spacer'),
-            h('label.cp-default-label', { for: 'cp-share-pft-relays' }, 'Relays'),
-            relaysInput,
-            h('div.cp-spacer'),
-            h('label.cp-default-label', { for: 'cp-share-pft-own-directory' }, 'Your inbox'),
-            ownDirectory,
-            h('div.cp-spacer'),
-            h('label.cp-default-label', { for: 'cp-share-pft-result' }, 'Result'),
-            resultOutput,
+            shareMode,
+            advanced,
             status
         ]);
         var $content = $(content);
@@ -608,81 +615,25 @@ define([
         var setWalletStatus = function (text, warning) {
             $(walletStatus).text(text || '').toggleClass('alert alert-warning', Boolean(warning));
         };
-        var setWalletUnlockError = function (err, fallback) {
-            console.error(err);
-            var message = (err && err.message) || fallback || String(err);
-            if (err && err.walletUnlocked) {
-                setStatus('Wallet unlocked, but inbox could not load: ' + message, true);
-                UI.warn('Wallet unlocked, but inbox could not load.');
-                return;
-            }
-            setWalletStatus(fallback || message, true);
-            UI.warn(fallback || message);
-        };
         var setVisible = function (el, visible) {
             $(el).toggleClass('cp-hidden', !visible);
             $(el).css('display', visible ? '' : 'none');
-        };
-        var showNoSavedWallet = function () {
-            setVisible(savedWalletUnlock, false);
-            setVisible(noSavedWallet, true);
-        };
-        var showSavedUnlock = function () {
-            setVisible(noSavedWallet, false);
-            setVisible(savedWalletUnlock, true);
-        };
-        var refreshSavedWalletUnlock = function () {
-            try {
-                var Core = getPostFiatWalletCore();
-                if (typeof(Core.getSavedWalletMeta) !== 'function') {
-                    showNoSavedWallet();
-                    setWalletStatus('Saved wallet storage is unavailable in this browser.', true);
-                    return;
-                }
-                var meta = Core.getSavedWalletMeta();
-                if (!meta || !meta.address) {
-                    $(savedWalletAddress).text('');
-                    showNoSavedWallet();
-                    setWalletStatus('Save an encrypted wallet from the login page before sharing.', true);
-                    return;
-                }
-                $(savedWalletAddress).text(meta.address);
-                showSavedUnlock();
-            } catch (err) {
-                console.error(err);
-                showNoSavedWallet();
-                setWalletStatus('Saved wallet storage is unavailable in this browser.', true);
-            }
         };
         var setWalletUnlocked = function (address) {
             var isUnlocked = Boolean(address);
             setVisible(walletUnlock, !isUnlocked);
             setVisible(walletSummary, isUnlocked);
-            $(unlockedAddress).text(address || '');
+            $(unlockedAddress).text(shortPostFiatAddress(address)).attr('title', address || '');
             if (isUnlocked) {
                 setWalletStatus('');
                 setStatus('');
-            } else {
-                refreshSavedWalletUnlock();
             }
         };
         var requireWalletUnlock = function (message) {
             activePostFiatSession = null;
             setWalletUnlocked('');
-            setWalletStatus(message || 'Unlock wallet here first.', true);
+            setWalletStatus(message || 'Open Post Fiat Docs to unlock your wallet, then reopen sharing.', true);
             UI.warn('Unlock Post Fiat wallet first.');
-        };
-        var rememberPostFiatSession = function (mnemonic) {
-            var Core = getPostFiatWalletCore();
-            if (typeof(Core.deriveWalletFromMnemonic) !== 'function') {
-                throw new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE');
-            }
-            var wallet = Core.deriveWalletFromMnemonic(mnemonic);
-            activePostFiatSession = {
-                mnemonic: wallet.mnemonic,
-                wallet: wallet
-            };
-            return activePostFiatSession;
         };
         var getCurrentPostFiatSessionWallet = async function () {
             if (activePostFiatSession && activePostFiatSession.mnemonic) {
@@ -693,7 +644,8 @@ define([
         };
         var renderContacts = function (contacts) {
             savedContacts = contacts || [];
-            var options = [h('option', { value: '' }, 'Paste recipient')];
+            setVisible(contactWrap, savedContacts.length > 0);
+            var options = [h('option', { value: '' }, 'Choose saved recipient')];
             savedContacts.forEach(function (contact, i) {
                 options.push(h('option', { value: String(i) }, PostFiatContacts.getLabel(contact)));
             });
@@ -711,7 +663,7 @@ define([
             var index = Number(value);
             var contact = savedContacts[index];
             if (!contact) { return; }
-            $(recipientInput).val(JSON.stringify(PostFiatContacts.toRecipient(contact), null, 2));
+            $(recipientInput).val(contact.walletAddress || contact.label || contact.publicKeyHex || '');
             if (contact.relays && contact.relays.length) {
                 $(relaysInput).val(contact.relays.join('\n'));
             }
@@ -734,77 +686,8 @@ define([
             return directory;
         };
 
-        var unlockWithMnemonic = async function (mnemonic) {
-            var Core = getPostFiatWalletCore();
-            var session = rememberPostFiatSession(mnemonic);
-            if (typeof(Core.createSessionWallet) === 'function') {
-                Core.createSessionWallet(session.mnemonic).then(function () {
-                    if (typeof(Core.startSessionWalletResponder) === 'function') {
-                        Core.startSessionWalletResponder();
-                    }
-                }).catch(function (err) {
-                    console.error(err);
-                });
-            }
-            $(savedWalletPassword).val('');
-            setWalletStatus('Wallet unlocked.');
-            setWalletUnlocked(session.wallet.address);
-            try {
-                return await loadOwnDirectory();
-            } catch (err) {
-                err.walletUnlocked = true;
-                throw err;
-            }
-        };
-
-        $(unlockSavedButton).on('click', function () {
-            var password = $(savedWalletPassword).val();
-            if (!password) {
-                setWalletStatus('Enter the saved wallet password.', true);
-                return;
-            }
-            var attempt = walletUnlockAttempt += 1;
-            setWalletStatus('Unlocking saved wallet...');
-            try {
-                var Core = getPostFiatWalletCore();
-                if (typeof(Core.unlockSavedWallet) !== 'function') {
-                    throw new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE');
-                }
-                Core.unlockSavedWallet(password).then(function (saved) {
-                    return unlockWithMnemonic(saved.mnemonic);
-                }).catch(function (err) {
-                    if (attempt !== walletUnlockAttempt) { return; }
-                    setWalletUnlockError(err, err && err.walletUnlocked ?
-                        undefined : 'Unable to unlock saved wallet.');
-                });
-            } catch (err) {
-                if (attempt !== walletUnlockAttempt) { return; }
-                setWalletUnlockError(err, 'Unable to unlock saved wallet.');
-            }
-        });
-        $(savedWalletPassword).on('keydown', function (e) {
-            if (e.which !== 13) { return; }
-            e.preventDefault();
-            $(unlockSavedButton).click();
-        });
-        $(openLoginButton).on('click', function () {
-            common.openURL('/login/#wallet-vault');
-        });
-        $(switchWalletButton).on('click', function () {
-            try {
-                var Core = getPostFiatWalletCore();
-                if (Core.clearSessionWallet) {
-                    Core.clearSessionWallet().catch(function (err) {
-                        console.error(err);
-                    });
-                }
-            } catch (err) {
-                console.error(err);
-            }
-            activePostFiatSession = null;
-            $(ownDirectory).val('');
-            setWalletUnlocked('');
-            setWalletStatus('');
+        $(openAppButton).on('click', function () {
+            common.openURL('/app/');
         });
         setWalletStatus('Checking wallet session...');
 
@@ -812,7 +695,7 @@ define([
             loadOwnDirectory().catch(function () {
                 if (activePostFiatSession && activePostFiatSession.mnemonic) { return; }
                 setWalletUnlocked('');
-                setWalletStatus('Unlock here to publish wallet shares.', true);
+                setWalletStatus('Open Post Fiat Docs to unlock your wallet, then reopen sharing.', true);
             });
         });
 
@@ -821,79 +704,6 @@ define([
             buttons: [
                 makeCancelButton(),
                 {
-                    className: 'secondary cp-share-pft-copy-inbox',
-                    name: 'Copy inbox',
-                    iconClass: 'copy',
-                    onClick: function () {
-                        setStatus('Loading inbox...');
-                        loadOwnDirectory().then(function (directory) {
-                            Clipboard.copy(JSON.stringify(directory, null, 2), function (err) {
-                                if (err) {
-                                    setStatus('Unable to copy inbox.', true);
-                                    return void UI.warn(Messages.error);
-                                }
-                                setStatus('Inbox copied.');
-                                UI.log(Messages.shareSuccess);
-                            });
-                        }).catch(function (err) {
-                            if (err && err.message === 'POSTFIAT_WALLET_SESSION_REQUIRED') {
-                                requireWalletUnlock('Unlock wallet here before copying your inbox.');
-                                return;
-                            }
-                            setStatus(err.message || String(err), true);
-                            UI.warn('Unlock your Post Fiat wallet first.');
-                        });
-                        return true;
-                    },
-                    keys: []
-                }, {
-                    className: 'secondary cp-share-pft-publish-inbox',
-                    name: 'Publish inbox',
-                    iconClass: 'upload',
-                    onClick: function () {
-                        if (!ShareWorkflow ||
-                                typeof(ShareWorkflow.publishOwnNostrInboxDirectory) !== 'function') {
-                            UI.warn('Post Fiat private sharing code is unavailable.');
-                            return true;
-                        }
-                        var $button = $('.alertify').find('button.cp-share-pft-publish-inbox');
-                        var relayList = parsePostFiatRelayInput($(relaysInput).val());
-                        $button.attr('disabled', 'disabled');
-                        setStatus('Publishing inbox...');
-                        getCurrentPostFiatSessionWallet().then(function (session) {
-                            return ShareWorkflow.publishOwnNostrInboxDirectory({
-                                mnemonic: session.mnemonic,
-                                postFiatConfig: ApiConfig.postFiat,
-                                fallbackRelays: relayList,
-                                relayUrls: relayList,
-                                origin: opts.origin || window.location.origin,
-                                timeoutMs: 10000
-                            });
-                        }).then(function (published) {
-                            var accepted = published.publishResults.filter(function (r) {
-                                return r.accepted;
-                            }).length;
-                            $(ownDirectory).val(JSON.stringify(published.directory, null, 2));
-                            setWalletUnlocked(published.directory.walletAddress);
-                            setStatus(accepted ?
-                                'Published inbox to ' + accepted + ' relay(s).' :
-                                'No relay accepted the inbox directory.', !accepted);
-                            if (accepted) { UI.log(Messages.shareSuccess); }
-                            else { UI.warn('No relay accepted the Post Fiat inbox directory.'); }
-                        }).catch(function (err) {
-                            if (err && err.message === 'POSTFIAT_WALLET_SESSION_REQUIRED') {
-                                requireWalletUnlock('Unlock wallet here before publishing your inbox.');
-                                return;
-                            }
-                            setStatus(err.message || String(err), true);
-                            UI.warn('Unable to publish Post Fiat inbox.');
-                        }).finally(function () {
-                            $button.removeAttr('disabled');
-                        });
-                        return true;
-                    },
-                    keys: []
-                }, {
                     className: 'primary cp-nobar cp-share-pft-publish',
                     name: 'Share to wallet',
                     iconClass: 'share',
@@ -956,7 +766,7 @@ define([
                             }
                         }).catch(function (err) {
                             if (err && err.message === 'POSTFIAT_WALLET_SESSION_REQUIRED') {
-                                requireWalletUnlock('Unlock wallet here before sharing.');
+                                requireWalletUnlock('Open Post Fiat Docs to unlock your wallet, then reopen sharing.');
                                 return;
                             }
                             setStatus(err.message || String(err), true);
@@ -1453,15 +1263,21 @@ define([
                 $rights.hide();
             }
         };
+        var onShowPostFiat = function () {
+            if (opts.static) { return; }
+            $rights.hide();
+        };
         if (opts.static) { $rights.hide(); }
 
         var pftSharingActive = Boolean(ApiConfig.postFiat);
         var contactsActive = !pftSharingActive && hasFriends && !priv.offline;
+        if (pftSharingActive) { onShowPostFiat(); }
         var tabs = [pftSharingActive ? {
             getTab: getPostFiatTab,
             title: 'Post Fiat',
             icon: 'share',
             active: true,
+            onShow: onShowPostFiat,
             onHide: resetTab
         } : undefined, {
             getTab: getContactsTab,
