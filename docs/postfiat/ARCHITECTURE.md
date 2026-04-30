@@ -110,6 +110,7 @@ Current implementation checkpoint:
 - `src/postfiat/private-share-workflow.mjs` ties PFT mnemonics, recipient directory records or raw recipient Nostr pubkeys, relay selection, gift wrapping, relay publish/fetch, and recipient open/decrypt into one UI-ready workflow.
 - `www/common/inner/share.js` loads `window.PostFiatPrivateShare` and adds a Post Fiat share tab that can copy the current wallet inbox JSON and publish a private live-pad share to relay(s).
 - `www/common/drive-ui.js` loads the same private-share bundle and adds a first-pass "Shared with me" Drive inbox that fetches Nostr gift wraps, decrypts live-pad payloads locally, and can open or save received pad links.
+- `www/common/postfiat-private-share-contacts.js` stores reusable private-share recipients in the user's CryptPad account attributes, avoiding repeated raw pubkey paste after the first exchange.
 - `/api/config` exposes `postFiat.nostr.relays`, `postFiat.nostr.privateRelays`, and `postFiat.nostr.relayProxy` for instance-level relay policy.
 - PFTL envelopes remain available only as explicit durable publish/export plumbing.
 

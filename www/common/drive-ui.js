@@ -26,6 +26,7 @@ define([
     '/customize/pages.js',
     '/common/pad-types.js',
     '/common/onlyoffice/broken-formats.js',
+    '/common/postfiat-private-share-contacts.js',
     '/common/postfiat-wallet-core.bundle.js',
     '/common/postfiat-private-share.bundle.js',
     '/common/common-icons.js'
@@ -51,6 +52,7 @@ define([
     Pages,
     PadTypes,
     BrokenFormats,
+    PostFiatContacts,
     Icons)
 {
 
@@ -3939,11 +3941,29 @@ define([
                         Icons.get('drive'),
                         'Save'
                     ]);
+                    var contactButton = share.senderPublicKeyHex && payload.sharedByWallet ?
+                        h('button.btn.btn-secondary', [
+                            Icons.get('contacts'),
+                            'Save sender'
+                        ]) : undefined;
                     $(openButton).on('click', function () {
                         openPostFiatPayload(payload);
                     });
                     $(saveButton).on('click', function () {
                         savePostFiatPayloadToDrive(payload);
+                    });
+                    $(contactButton).on('click', function () {
+                        PostFiatContacts.upsert(common, {
+                            walletAddress: payload.sharedByWallet,
+                            publicKeyHex: share.senderPublicKeyHex,
+                            relays: parsePostFiatRelayInput($(relayInput).val())
+                        }, function (err) {
+                            if (err) {
+                                console.error(err);
+                                return void UI.warn(Messages.error);
+                            }
+                            UI.log(Messages.saved);
+                        });
                     });
                     $list.append(h('div.list-group-item.cp-drive-pft-inbox-item', [
                         h('div.cp-drive-pft-inbox-title', payload.title || 'Untitled document'),
@@ -3955,7 +3975,8 @@ define([
                         h('div.cp-spacer'),
                         h('div.btn-group', [
                             openButton,
-                            saveButton
+                            saveButton,
+                            contactButton
                         ])
                     ]));
                 });

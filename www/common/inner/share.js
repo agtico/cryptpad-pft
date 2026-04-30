@@ -17,13 +17,14 @@ define([
     '/components/nthen/index.js',
     '/customize/pages.js',
     '/common/common-icons.js',
+    '/common/postfiat-private-share-contacts.js',
     '/common/postfiat-wallet-core.bundle.js',
     '/common/postfiat-private-share.bundle.js',
 
     '/components/file-saver/FileSaver.min.js',
     '/lib/qrcode.min.js',
 ], function ($, ApiConfig, Util, Hash, UI, UIElements, Feedback, Modal, h, Clipboard,
-             Messages, nThen, Pages, Icons) {
+             Messages, nThen, Pages, Icons, PostFiatContacts) {
     var Share = {};
 
     var embeddableApps = [
@@ -406,9 +407,12 @@ define([
 
     var getPostFiatTab = function (Env, data, opts, _cb) {
         var cb = Util.once(Util.mkAsync(_cb));
+        var common = Env.common;
         var relays = getPostFiatRelays();
         var ShareWorkflow = window.PostFiatPrivateShare;
+        var savedContacts = [];
 
+        var contactSelect = h('select.form-control#cp-share-pft-contact');
         var recipientInput = h('textarea.form-control#cp-share-pft-recipient', {
             rows: 4,
             spellcheck: false,
@@ -433,6 +437,9 @@ define([
         });
         var status = h('div.cp-share-pft-status', { role: 'status' });
         var content = h('div.cp-share-modal.cp-share-pft', [
+            h('label.cp-default-label', { for: 'cp-share-pft-contact' }, 'Saved recipient'),
+            contactSelect,
+            h('div.cp-spacer'),
             h('label.cp-default-label', { for: 'cp-share-pft-recipient' }, 'Recipient'),
             recipientInput,
             h('div.cp-spacer'),
@@ -451,6 +458,32 @@ define([
         var setStatus = function (text, warning) {
             $(status).text(text || '').toggleClass('alert alert-warning', Boolean(warning));
         };
+        var renderContacts = function (contacts) {
+            savedContacts = contacts || [];
+            var options = [h('option', { value: '' }, 'Paste recipient')];
+            savedContacts.forEach(function (contact, i) {
+                options.push(h('option', { value: String(i) }, PostFiatContacts.getLabel(contact)));
+            });
+            $(contactSelect).empty().append(options);
+        };
+        var loadContacts = function () {
+            PostFiatContacts.list(common, function (err, contacts) {
+                if (err) { return void console.error(err); }
+                renderContacts(contacts);
+            });
+        };
+        $(contactSelect).on('change', function () {
+            var value = $(contactSelect).val();
+            if (value === '') { return; }
+            var index = Number(value);
+            var contact = savedContacts[index];
+            if (!contact) { return; }
+            $(recipientInput).val(JSON.stringify(PostFiatContacts.toRecipient(contact), null, 2));
+            if (contact.relays && contact.relays.length) {
+                $(relaysInput).val(contact.relays.join('\n'));
+            }
+        });
+        loadContacts();
 
         var loadOwnDirectory = async function () {
             if (!ShareWorkflow || typeof(ShareWorkflow.buildOwnNostrInboxDirectory) !== 'function') {
@@ -545,6 +578,16 @@ define([
                                 'No relay accepted the share.', !accepted);
                             if (accepted) { UI.log(Messages.shareSuccess); }
                             else { UI.warn('No relay accepted the Post Fiat share.'); }
+                            if (accepted) {
+                                PostFiatContacts.upsert(common, {
+                                    walletAddress: published.recipient.walletAddress,
+                                    publicKeyHex: published.recipient.publicKeyHex,
+                                    relays: published.relays
+                                }, function (err) {
+                                    if (err) { return void console.error(err); }
+                                    loadContacts();
+                                });
+                            }
                         }).catch(function (err) {
                             setStatus(err.message || String(err), true);
                             UI.warn('Unable to publish Post Fiat share.');
