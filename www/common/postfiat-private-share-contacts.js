@@ -55,6 +55,19 @@ define([], function () {
         return contact.walletAddress || contact.label || contact.publicKeyHex.slice(0, 12);
     };
 
+    var matchesContact = function (contact, id) {
+        var normalizedId = String(id || '').trim().toLowerCase();
+        if (!normalizedId) { return false; }
+        return [
+            contact.id,
+            contact.walletAddress,
+            contact.publicKeyHex,
+            contact.label
+        ].filter(Boolean).some(function (value) {
+            return String(value).trim().toLowerCase() === normalizedId;
+        });
+    };
+
     Contacts.list = function (common, cb) {
         common.getAttribute(ATTR_PATH, function (err, val) {
             if (err) { return void cb(err); }
@@ -73,9 +86,10 @@ define([], function () {
 
     Contacts.upsert = function (common, input, cb) {
         cb = cb || function () {};
+        var raw = input || {};
         var contact;
         try {
-            contact = normalizeContact(input);
+            contact = normalizeContact(raw);
         } catch (err) {
             return void cb(err);
         }
@@ -87,7 +101,12 @@ define([], function () {
                     return existing;
                 }
                 found = true;
-                return contact;
+                return normalizeContact({
+                    walletAddress: raw.walletAddress ? contact.walletAddress : existing.walletAddress,
+                    label: raw.label ? contact.label : existing.label,
+                    publicKeyHex: contact.publicKeyHex,
+                    relays: contact.relays.length ? contact.relays : existing.relays
+                });
             });
             if (!found) { contacts.push(contact); }
             contacts.sort(function (a, b) {
@@ -99,13 +118,22 @@ define([], function () {
         });
     };
 
+    Contacts.find = function (common, id, cb) {
+        cb = cb || function () {};
+        Contacts.list(common, function (err, contacts) {
+            if (err) { return void cb(err); }
+            cb(void 0, contacts.find(function (contact) {
+                return matchesContact(contact, id);
+            }) || null);
+        });
+    };
+
     Contacts.remove = function (common, id, cb) {
         cb = cb || function () {};
         Contacts.list(common, function (err, contacts) {
             if (err) { return void cb(err); }
-            var normalizedId = String(id || '').trim();
             common.setAttribute(ATTR_PATH, contacts.filter(function (contact) {
-                return contact.id !== normalizedId && contact.publicKeyHex !== normalizedId;
+                return !matchesContact(contact, id);
             }), cb);
         });
     };

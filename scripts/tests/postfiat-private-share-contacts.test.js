@@ -72,13 +72,23 @@ test('stores, lists, updates, and removes Post Fiat private share contacts', asy
         Contacts.list(common, (err, contacts) => {
             if (err) { return reject(err); }
             assert.equal(contacts.length, 1);
+            assert.equal(contacts[0].walletAddress, 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh');
             assert.deepEqual(contacts[0].relays, ['wss://relay-two.example']);
             resolve();
         });
     });
 
     await new Promise((resolve, reject) => {
-        Contacts.remove(common, publicKeyHex, (err) => err ? reject(err) : resolve());
+        Contacts.find(common, 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh', (err, contact) => {
+            if (err) { return reject(err); }
+            assert.equal(contact.publicKeyHex, publicKeyHex);
+            resolve();
+        });
+    });
+
+    await new Promise((resolve, reject) => {
+        Contacts.remove(common, 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh', (err) =>
+            err ? reject(err) : resolve());
     });
 
     await new Promise((resolve, reject) => {
