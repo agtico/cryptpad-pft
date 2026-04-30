@@ -22,10 +22,10 @@ Status values:
 
 - [~] Port Task Node BIP39 wallet primitives into this fork as a browser module.
 - [x] Use `@scure/bip39` and XRPL `Wallet.fromMnemonic` with path `m/44'/144'/0'/0/0`.
-- [~] Implement create wallet, restore wallet, unlock wallet, lock wallet.
+- [x] Implement create wallet, restore wallet, unlock wallet, lock wallet.
 - [x] Store encrypted wallet payload with PBKDF2-SHA256/AES-GCM.
 - [x] Keep wallet-derived CryptPad login capabilities in session storage only.
-- [ ] Use encrypted session-only unlocked mnemonic handling patterned after `pftasks/app/src/lib/wallet/session.js`.
+- [x] Use encrypted session-only unlocked mnemonic handling patterned after `pftasks/app/src/lib/wallet/session.js`.
 - [x] Add wallet signing helper for canonical Post Fiat login/access messages.
 - [ ] Add MetaMask PFTL Snap support as an optional wallet provider.
 - [x] Add tests for mnemonic normalization, derivation path, address derivation, and signature verification.
@@ -44,7 +44,7 @@ Status values:
 - [x] Add public `postFiat.walletFirst` and `postFiat.disableLegacyLogin` instance config.
 - [x] Move legacy username/password login behind an explicit compatibility button by default.
 - [ ] Decide migration behavior for old username/password users.
-- [~] Add wallet-login UI for create/restore/unlock.
+- [x] Add wallet-login UI for create/restore/unlock.
 - [x] Add saved-wallet unlock path that avoids repeated seed paste.
 - [ ] Add server nonce session only where server authorization is needed.
 - [ ] Add e2e test: restore same 24-word seed in a new browser and recover same CryptPad drive.
@@ -53,25 +53,29 @@ Status values:
 
 - [~] Reuse existing Domain `x25519:` lookup from `pfdapp/cryptpad`.
 - [~] Reuse Task Node `MessageKey` publication from `pftasks`.
-- [ ] Implement key lookup order: MessageKey first, Domain fallback second.
-- [ ] Implement publish/update X25519 public key for Task Node wallet users.
+- [x] Implement key lookup order: MessageKey first, Domain fallback second.
+- [~] Implement publish/update X25519 public key for Task Node wallet users.
 - [ ] Define key bundle format for future Ed25519 signing-key verification.
-- [ ] Add tests for recipient id derivation and key lookup failures.
+- [x] Add tests for recipient id derivation and key lookup failures.
 
-## Phase 4: PFTL Sharing Bridge For Live CryptPad Pads
+## Phase 4: Nostr Private Sharing Bridge For Live CryptPad Pads
 
+- [x] Derive a Nostr inbox identity from the PFT wallet using a domain-separated wallet signature.
+- [x] Define a PFT wallet directory record: wallet address -> Nostr public key -> preferred relay set.
+- [x] Add Nostr relay config, including PFT-operated default relays and user/private relay overrides.
+- [x] Package pad capability secrets as a canonical live-pad share payload.
+- [ ] Encrypt live-pad share payloads with NIP-44 and wrap/deliver them with NIP-59/NIP-17 style private events.
 - [ ] Add "Share to wallet" as the primary share action in the CryptPad share modal.
-- [ ] Package pad capability secrets as encrypted PFTL v3 payloads.
-- [ ] Publish encrypted content blob and access manifest.
-- [ ] Send `pf.ptr/v2` pointer memo to recipient wallet.
-- [ ] Add "Shared with me" inbox based on pointer transaction list.
-- [ ] Let recipient import/open a received live pad.
-- [ ] Keep raw link copy available as an advanced/legacy action.
-- [ ] Add e2e test: wallet A creates pad, shares to wallet B, wallet B opens it.
+- [ ] Add "Shared with me" inbox based on encrypted Nostr relay messages, not on-chain pointer scans.
+- [ ] Let recipient import/open a received live pad from the private inbox.
+- [ ] Add peer chat/replies around shared documents using the same encrypted relay channel.
+- [ ] Keep raw CryptPad link copy available as an advanced/legacy action.
+- [ ] Add e2e test: wallet A creates pad, shares privately to wallet B via Nostr relay, wallet B opens it.
 
-## Phase 5: Native PFTL Documents
+## Phase 5: Durable PFTL/IPFS Publishing
 
 - [~] Existing `/ipfs/` viewer in `pfdapp/cryptpad` decrypts and shares PFTL v3 docs.
+- [ ] Treat IPFS/PFTL as explicit durable/export/publication mode, not default sharing.
 - [ ] Extract the viewer's crypto/IPFS/XRPL code into modules.
 - [ ] Integrate PFTL docs into main drive UI.
 - [ ] Support document creation as PFTL `ContentBlob`.
@@ -79,6 +83,8 @@ Status values:
 - [ ] Support key/content rotation for practical revocation.
 - [ ] Show owner wallet, shared-by wallet, recipient wallet, and manifest CID.
 - [ ] Verify content and manifest signatures before showing strong ownership claims.
+- [ ] If Orchard/shielded PFTL is added, keep document CIDs/manifests/pinning metadata out of the shielded transaction path unless the user explicitly opts in.
+- [ ] Label durable publication with clear privacy warnings about observable CIDs, pinning providers, gateways, timing, and retention.
 - [ ] Add tests for decrypt, share, rotate, and corrupted manifest/blob handling.
 
 ## Phase 6: UI Redesign
@@ -96,7 +102,9 @@ Status values:
 ## Phase 7: Server And Deployment
 
 - [ ] Decide whether Post Fiat APIs live in `lib/http-worker.js` or a separate module.
-- [ ] Add environment config for PFTL RPC/WSS, network id, IPFS gateway, and pinning backend.
+- [~] Add environment config for Nostr relays, relay discovery, relay retention, and optional PFT-operated private relay defaults.
+- [~] Add environment config for PFTL RPC/WSS, network id, IPFS gateway, and pinning backend.
+- [ ] Add optional Nostr relay proxy for privacy-preserving relay access from hosted instances.
 - [ ] Add wallet nonce verification endpoint for server sessions.
 - [ ] Add PFTL pointer list endpoint with pagination.
 - [ ] Add manifest/blob fetch endpoints preserving signatures.
@@ -106,10 +114,13 @@ Status values:
 ## Phase 8: Security Review
 
 - [ ] Threat model mnemonic handling, wallet signatures, XSS, and malicious documents.
-- [ ] Confirm all signing messages are domain-separated.
+- [~] Confirm all signing messages are domain-separated.
+- [ ] Threat model Nostr relay metadata: IPs, timing, relay choice, event sizes, retention, and replay.
+- [x] Ensure PFT wallet-derived Nostr keys are separate from XRPL/PFT signing keys and domain-separated.
 - [ ] Remove raw mnemonic/localStorage usage from final runtime paths.
 - [ ] Review CSP and sandboxing around editors and custom wallet scripts.
 - [ ] Verify XRPL transaction construction and network IDs.
+- [ ] Verify IPFS/PFTL publication is never the silent default for normal document sharing.
 - [ ] Verify revocation language in UI is accurate.
 - [ ] Review legacy CryptPad raw URL sharing for accidental primary exposure.
 
@@ -122,8 +133,8 @@ Status values:
 
 ## Immediate Next Tasks
 
-1. Add wallet creation/onboarding with a save-confirm step.
-2. Add browser e2e tests for wallet-first login, saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
-3. Add proper in-session mnemonic/key handling for PFTL sharing operations.
-4. Implement a minimal share-to-wallet bridge that encrypts a CryptPad URL secret as a PFTL v3 document.
-5. Start the visual redesign of drive around the Post Fiat shell.
+1. Add browser e2e tests for wallet-first login, saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
+2. Implement NIP-44 encryption and NIP-59/NIP-17-style wrapping for `src/postfiat/live-pad-share.mjs` payloads.
+3. Wire the private share payload into a real share-to-wallet modal and deliver it over encrypted Nostr events.
+4. Add a private "Shared with me" Nostr inbox before adding any on-chain/IPFS pointer inbox.
+5. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.

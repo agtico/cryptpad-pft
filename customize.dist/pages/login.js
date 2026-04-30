@@ -63,6 +63,46 @@ define([
                                     }, 'Forget'),
                                 ]),
                             ]),
+                            h('div#pft-create-wallet', [
+                                h('div.extra', [
+                                    h('button#pft-create-wallet-button.btn.btn-secondary', {
+                                        type: 'button',
+                                    }, 'Create new wallet'),
+                                ]),
+                                h('div#pft-generated-wallet.cp-hidden', [
+                                    h('div.big-container', [
+                                        h('div.input-container', [
+                                            h('label.cp-default-label', { for: 'pft-generated-mnemonic' }, 'Generated 24-word seed phrase'),
+                                            h('textarea.form-control#pft-generated-mnemonic', {
+                                                name: 'pft-generated-mnemonic',
+                                                autocomplete: 'off',
+                                                autocorrect: 'off',
+                                                autocapitalize: 'off',
+                                                spellcheck: false,
+                                                readonly: true,
+                                                rows: 3,
+                                            }),
+                                        ]),
+                                        h('div.input-container', [
+                                            h('label.cp-default-label', 'Generated wallet address'),
+                                            h('div#pft-generated-wallet-address.form-control', {
+                                                tabindex: 0,
+                                            }),
+                                        ]),
+                                    ]),
+                                    h('div.checkbox-container', [
+                                        UI.createCheckbox('pft-generated-confirm', 'I saved this seed phrase'),
+                                    ]),
+                                    h('div.extra', [
+                                        h('button#pft-use-generated-wallet.btn.btn-primary', {
+                                            type: 'button',
+                                        }, 'Use generated wallet'),
+                                        h('button#pft-regenerate-wallet.btn.btn-secondary', {
+                                            type: 'button',
+                                        }, 'Regenerate'),
+                                    ]),
+                                ]),
+                            ]),
                             h('div.big-container', [
                                 h('div.input-container', [
                                     h('label.cp-default-label', { for: 'pft-mnemonic' }, '24-word seed phrase'),

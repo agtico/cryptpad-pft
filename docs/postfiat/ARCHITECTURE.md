@@ -10,7 +10,8 @@ Primary user-facing concepts:
 - wallet drive,
 - wallet contacts,
 - documents shared to/from wallets,
-- PFTL document pointers,
+- private Nostr share/chat inbox,
+- optional durable PFTL document pointers,
 - live collaborative pads as one supported document type.
 
 CryptPad internals should remain where they are strong: encrypted realtime editing, drive storage, pad apps, and operational deployment. Post Fiat should own identity, wallet login, and cross-wallet sharing.
@@ -68,9 +69,15 @@ Recommendation:
 
 ## Document Sharing
 
-### Phase 1: PFTL Bridge For Live CryptPad Pads
+### Privacy Position
 
-This is the fastest useful product:
+Normal document sharing should not publish a durable on-chain or IPFS-visible artifact by default. PFT should be the root identity, payment, entitlement, and recovery system, but the document share graph should stay off-chain unless the user explicitly chooses durable publication.
+
+PFTL shielded transactions, including a future Orchard-style privacy layer, can hide transaction participants and amounts. They do not automatically hide IPFS CIDs, pinning providers, gateway usage, relay timing, browser/network metadata, or the fact that a durable pointer exists. For private collaboration, the default transport should be an encrypted relay inbox.
+
+### Phase 1: Nostr Private Bridge For Live CryptPad Pads
+
+This is the fastest useful privacy-preserving product:
 
 1. User creates or opens a normal CryptPad pad.
 2. Instead of showing raw link-sharing as the primary action, the app offers "Share to wallet".
@@ -82,26 +89,43 @@ This is the fastest useful product:
   "href": "/pad/#/...",
   "title": "...",
   "mode": "edit|view",
-  "created_at": "..."
+  "createdAt": "..."
 }
 ```
 
-4. Encrypt the payload as a PFTL v3 content object.
-5. Publish/update an access manifest.
-6. Send an XRPL `pf.ptr/v2` pointer memo to the recipient wallet.
-7. Recipient opens their PFT inbox, decrypts the payload, and imports/opens the pad.
+4. Resolve the recipient wallet to a Nostr inbox key and preferred relay set.
+5. Encrypt the payload with a PFT wallet-derived Nostr identity using NIP-44.
+6. Wrap and deliver it with NIP-59/NIP-17 style private events.
+7. Recipient opens their private "Shared with me" inbox, decrypts the payload, and imports/opens the pad.
 
-This keeps the realtime CryptPad model intact while removing raw URL sharing from the primary Post Fiat UX.
+This keeps the realtime CryptPad model intact while removing raw URL sharing from the primary Post Fiat UX and avoiding a permanent on-chain share graph.
 
-### Phase 2: Native PFTL Documents
+Current implementation checkpoint:
 
-The target model for portable cross-instance documents:
+- `src/postfiat/nostr-identity.mjs` derives a Nostr secp256k1 keypair from a domain-separated PFT wallet signature and defines wallet -> Nostr pubkey -> relay directory records.
+- `src/postfiat/live-pad-share.mjs` builds canonical live-pad payloads and marks Nostr as the normal private-share envelope transport.
+- `/api/config` exposes `postFiat.nostr.relays`, `postFiat.nostr.privateRelays`, and `postFiat.nostr.relayProxy` for instance-level relay policy.
+- PFTL envelopes remain available only as explicit durable publish/export plumbing.
+
+PFT wallet lock-in still comes from:
+
+- wallet-native login and recovery;
+- wallet-to-inbox directory and contact records;
+- PFT-operated relay defaults and paid private relay tiers;
+- PFT entitlements, quotas, and payments;
+- optional PFTL durable publication.
+
+Nostr relay transport should be treated as metadata-leaky but better than on-chain/IPFS defaults. Relays can observe IP addresses, event timing, relay choice, approximate payload sizes, and retention behavior. The product should support user relay overrides, private PFT relays, and eventually relay proxying/Tor-friendly access.
+
+### Phase 2: Durable PFTL/IPFS Documents
+
+The target model for portable cross-instance documents and explicit durable publication:
 
 - `ContentBlob`: encrypted immutable document payload.
 - `AccessManifest`: replaceable recipient key-shard list pointing to the content CID.
 - `pf.ptr/v2`: ledger pointer memo delivering/indexing the manifest CID.
 
-The current `pfdapp/cryptpad/customize/www/ipfs/index.html` already proves this model. This fork should modularize that code and integrate it into the main drive/share UI.
+The current `pfdapp/cryptpad/customize/www/ipfs/index.html` already proves this model. This fork should modularize that code and integrate it as an advanced/export/publish flow, not the default share action.
 
 ### Revocation
 
@@ -119,6 +143,8 @@ Removing a recipient from a future manifest only prevents future discovery/decry
 Add a small Post Fiat API surface around CryptPad's existing `http-worker` or as a separate module:
 
 - wallet nonce challenge and verification;
+- Nostr relay configuration and relay directory lookup;
+- optional PFT relay proxy for hosted privacy mode;
 - XRPL RPC/proxy configuration;
 - key lookup by wallet address;
 - key publication helper where browser signing is not enough;
@@ -138,10 +164,12 @@ Core surfaces:
 - wallet drive,
 - shared with me,
 - sent by me,
+- private document chat,
 - contacts,
 - document editor,
 - share-to-wallet modal,
-- PFTL document inspector/debug panel for early builds.
+- Nostr inbox/relay health panel,
+- PFTL durable publication inspector/debug panel for early builds.
 
 Design constraints:
 
@@ -150,14 +178,20 @@ Design constraints:
 - icon buttons for tools;
 - no huge decorative landing hero;
 - clear wallet/account state in the shell;
-- PFT-native share action should be more prominent than raw link copy.
+- PFT-native private share action should be more prominent than raw link copy;
+- durable PFTL/IPFS publishing should be explicit and carry privacy warnings.
 
 ## Security Notes
 
 - Do not store raw mnemonics in localStorage.
 - Reuse the `pftasks` session pattern: non-extractable key in IndexedDB plus encrypted session material in sessionStorage.
+- PFT wallet-derived Nostr keys must stay domain-separated from XRPL/PFT signing keys and must not be used as ledger keys.
 - Review the existing `pftasks` localStorage encrypted-wallet backup before copying it; it improves recovery but broadens XSS blast radius.
 - Keep all wallet-signing messages domain-separated and human-readable.
+- Derive Nostr inbox keys separately from XRPL/PFT signing keys using a domain-separated wallet signature.
+- Treat Nostr relay metadata as observable: IPs, timing, relay choice, event sizes, and retention.
+- Keep normal document sharing off-chain by default.
 - Verify XRPL signatures server-side when issuing server sessions.
 - Verify PFTL content/manifest signatures client-side before showing ownership claims.
+- Do not silently upload document manifests, CIDs, or share pointers to IPFS/PFTL.
 - Keep AGPL source availability requirements visible in deployment docs.

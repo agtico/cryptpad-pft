@@ -25,9 +25,20 @@ Implemented so far:
 - `www/common/outer/local-store.js`: wallet logins store CryptPad login capabilities in `sessionStorage` only, ignore stale persisted wallet-looking `Block_hash` values, and expose `BroadcastChannel` helpers for future explicit cross-tab unlock.
 - `www/drive/main.js` and `www/login/main.js`: do not silently import an active wallet session; new tabs must unlock explicitly unless an explicit UI is added later.
 - `www/common/postfiat-wallet-core.bundle.js`: browser bundle for mnemonic derivation and message signing.
-- `config/config.example.js`, `lib/env.js`, and `lib/http-worker.js`: public `postFiat.walletFirst` and `postFiat.disableLegacyLogin` config exposed through `/api/config`.
-- `customize.dist/pages/login.js` and `www/login/main.js`: wallet-first login surface with 24-word seed phrase login, encrypted saved-wallet unlock, and legacy username/password login behind a compatibility button by default.
-- `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, and wallet session storage.
+- `config/config.example.js`, `lib/env.js`, and `lib/http-worker.js`: public `postFiat.walletFirst`, `postFiat.disableLegacyLogin`, `postFiat.pftl`, and `postFiat.nostr` config exposed through `/api/config`.
+- `customize.dist/pages/login.js` and `www/login/main.js`: wallet-first login surface with generated 24-word wallet creation, seed phrase restore, encrypted saved-wallet unlock, and legacy username/password login behind a compatibility button by default.
+- `src/postfiat/wallet-core.mjs`: session-only encrypted mnemonic handoff using a non-extractable AES-GCM key in IndexedDB plus encrypted material in `sessionStorage`.
+- `src/postfiat/key-registry.mjs`: recipient X25519 key parsing with Task Node `MessageKey` preferred over legacy Domain `x25519:`, plus an AccountSet transaction shape helper for MessageKey publication.
+- `src/postfiat/nostr-identity.mjs`: PFT wallet-signature-derived Nostr keypair and wallet -> Nostr pubkey -> relay directory record helpers.
+- `src/postfiat/live-pad-share.mjs`: canonical plaintext envelope for packaging live CryptPad pad capabilities before encrypted Nostr delivery, plus explicit durable PFTL envelope plumbing.
+- `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, wallet session storage, key registry parsing, Nostr identity/directory records, and live-pad share payloads.
+
+Architecture pivot to preserve privacy:
+
+- PFT remains the identity, entitlement, recovery, and payment layer.
+- Nostr-style encrypted relay delivery should be the default document share/chat transport.
+- PFTL/IPFS should be an explicit durable publication/export path, not normal sharing.
+- Future Orchard/shielded PFTL work protects transaction metadata but does not by itself hide IPFS CIDs, pinning providers, gateway access, or durable pointer existence.
 
 ## Do Not Re-Discover These First
 
@@ -38,6 +49,7 @@ Use these local repos as references:
 /home/pfrpc/repos/pfdapp/docs/WALLET_DOCUMENT_SHARING_AND_OWNERSHIP.md
 /home/pfrpc/repos/pftasks/app/src/lib/wallet
 /home/pfrpc/repos/pftasks/app/src/lib/pftl/transactions.js
+/home/pfrpc/repos/pftasks/app/src/lib/pftl/wss.js
 /home/pfrpc/repos/sprs/app/production_app.py
 /home/pfrpc/repos/sprs/app/services/auth.py
 /home/pfrpc/repos/sprs/app/services/cryptpad_escrow.py
@@ -45,12 +57,11 @@ Use these local repos as references:
 
 ## Recommended Implementation Order
 
-1. Add wallet creation/onboarding with a save-confirm step.
-2. Add browser e2e coverage for wallet-first login, seed login, saved-wallet unlock, session lock, and drive recovery.
-3. Add proper in-session mnemonic/key handling for PFTL sharing operations.
-4. Port PFTL key lookup/publication.
-5. Add share-to-wallet bridge for CryptPad URL secrets.
-6. Only then start native PFTL document integration and broad UI redesign.
+1. Add browser e2e coverage for wallet-first login, seed login, saved-wallet unlock, session lock, and drive recovery.
+2. Implement NIP-44 encryption and NIP-59/NIP-17-style wrapping around the canonical live-pad payload.
+3. Wire `src/postfiat/live-pad-share.mjs` into a real share-to-wallet modal and deliver it over encrypted Nostr events.
+4. Build the private "Shared with me" Nostr inbox before any on-chain/IPFS pointer inbox.
+5. Keep PFTL/IPFS durable publishing behind explicit UX and privacy warnings.
 
 ## Key Technical Decisions Already Made
 
@@ -58,12 +69,15 @@ Use these local repos as references:
 - Primary wallet UX is Task Node 24-word seed phrase.
 - Username/password login is legacy compatibility. Keep it hidden by default, and only hard-disable it with `postFiat.disableLegacyLogin` after account migration is solved.
 - MetaMask Snap support is optional, not the only path.
-- Canonical share model is PFTL v3 ContentBlob/AccessManifest plus XRPL pointer memo.
+- Canonical private share model is encrypted Nostr relay delivery of live-pad capability payloads.
+- Durable/publication share model is PFTL v3 ContentBlob/AccessManifest plus XRPL pointer memo, used only when the user explicitly chooses durable publication/export.
 - Raw CryptPad URL sharing should be legacy/advanced, not the main PFT UX.
+- IPFS/PFTL should not be the silent default because CIDs, pinning providers, gateways, timing, and retention can create a document activity trail even if payments are shielded.
 - Revocation requires file-key/content rotation.
 - Wallet login should not leave a persistent CryptPad `Block_hash` in `localStorage`; it should unlock the current browser session only.
 - Manually opened new tabs should not silently borrow the active wallet session. If explicit cross-tab unlock is added later, it must be user-initiated.
 - Saved wallet vaults are encrypted locally with PBKDF2-SHA256/AES-GCM; the vault unlock password is not a CryptPad password.
+- Nostr relay privacy is not perfect: relays can observe IPs, timing, relay choices, event sizes, and retention. Support PFT-operated private relays, user relay overrides, and eventually proxy/Tor-friendly relay access.
 
 ## Known Traps
 
@@ -84,5 +98,6 @@ Use these local repos as references:
 - Login/register into CryptPad with wallet-derived account material.
 - Reload the browser and recover the same drive.
 - Open a new same-origin `/drive/` tab while the first wallet tab is still unlocked and confirm it does not silently unlock.
-- Share a live pad to a second wallet through a PFTL encrypted payload.
-- Recipient decrypts the pointer payload and opens/imports the pad.
+- Share a live pad to a second wallet through encrypted Nostr relay delivery.
+- Recipient decrypts the private inbox payload and opens/imports the pad.
+- Durable PFTL/IPFS publication remains an explicit advanced flow with privacy warnings.

@@ -12,6 +12,7 @@ define([
 ], function (Constants, Hash, Cache, localForage, AppConfig, Util) {
     var LocalStore = {};
     var pftWalletSessionKey = 'PFT_wallet_session';
+    var pftSessionWalletStorageKey = 'PFT_session_wallet';
     var pftWalletSessionChannelName = 'PFT_wallet_session_channel';
     var pftWalletSessionRequest = 'PFT_WALLET_SESSION_REQUEST';
     var pftWalletSessionResponse = 'PFT_WALLET_SESSION_RESPONSE';
@@ -49,6 +50,7 @@ define([
     var removeWalletSession = function () {
         [
             pftWalletSessionKey,
+            pftSessionWalletStorageKey,
             Constants.userNameKey,
             Constants.userHashKey,
             Constants.blockHashKey,

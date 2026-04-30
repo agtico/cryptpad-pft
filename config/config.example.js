@@ -116,6 +116,17 @@ module.exports = {
     postFiat: {
         walletFirst: true,
         disableLegacyLogin: false,
+        pftl: {
+            networkId: 2025,
+            rpcUrl: '',
+            wssUrl: '',
+            ipfsGateway: '',
+        },
+        nostr: {
+            relays: [],
+            privateRelays: [],
+            relayProxy: '',
+        },
     },
 
 /*  CryptPad will launch a child process for every core available

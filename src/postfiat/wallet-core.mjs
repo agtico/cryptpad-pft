@@ -14,6 +14,11 @@ export const WALLET_VAULT_STORAGE_KEY = 'PFT_wallet_vault';
 export const WALLET_VAULT_KDF_ITERATIONS = 250000;
 export const WALLET_VAULT_SALT_BYTES = 16;
 export const WALLET_VAULT_IV_BYTES = 12;
+export const SESSION_WALLET_STORAGE_KEY = 'PFT_session_wallet';
+export const SESSION_WALLET_DB_NAME = 'postfiat_session_wallet';
+export const SESSION_WALLET_DB_VERSION = 1;
+export const SESSION_WALLET_STORE = 'session_keys';
+export const SESSION_WALLET_RECORD_KEY = 'active';
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -31,6 +36,50 @@ const getStorage = (storage) => {
     if (globalThis.localStorage) { return globalThis.localStorage; }
     throw new Error('LOCAL_STORAGE_UNAVAILABLE');
 };
+
+const getSessionStorage = (storage) => {
+    if (storage) { return storage; }
+    if (globalThis.sessionStorage) { return globalThis.sessionStorage; }
+    throw new Error('SESSION_STORAGE_UNAVAILABLE');
+};
+
+const openSessionDb = () => new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+        reject(new Error('INDEXEDDB_UNAVAILABLE'));
+        return;
+    }
+    const request = indexedDB.open(SESSION_WALLET_DB_NAME, SESSION_WALLET_DB_VERSION);
+    request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(SESSION_WALLET_STORE)) {
+            db.createObjectStore(SESSION_WALLET_STORE);
+        }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+});
+
+const transactionRequest = async (mode, handler) => {
+    const db = await openSessionDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(SESSION_WALLET_STORE, mode);
+        const store = tx.objectStore(SESSION_WALLET_STORE);
+        const request = handler(store);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+const defaultSessionKeyStore = {
+    put: (key) => transactionRequest('readwrite', (store) =>
+        store.put(key, SESSION_WALLET_RECORD_KEY)),
+    get: () => transactionRequest('readonly', (store) =>
+        store.get(SESSION_WALLET_RECORD_KEY)),
+    delete: () => transactionRequest('readwrite', (store) =>
+        store.delete(SESSION_WALLET_RECORD_KEY)),
+};
+
+const getSessionKeyStore = (keyStore) => keyStore || defaultSessionKeyStore;
 
 export const bytesToBase64 = (bytes) => {
     const normalized = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -259,4 +308,90 @@ export const unlockSavedWallet = async (password, options = {}) => {
 export const clearSavedWallet = (storage) => {
     const store = getStorage(storage);
     store.removeItem(WALLET_VAULT_STORAGE_KEY);
+};
+
+export const createSessionWallet = async (mnemonic, options = {}) => {
+    const wallet = deriveWalletFromMnemonic(mnemonic);
+    const cryptoApi = getCrypto();
+    const storage = getSessionStorage(options.storage);
+    const keyStore = getSessionKeyStore(options.keyStore);
+    const key = await cryptoApi.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+    const iv = cryptoApi.getRandomValues(new Uint8Array(WALLET_VAULT_IV_BYTES));
+    const payload = {
+        mnemonic: wallet.mnemonic,
+        address: wallet.address,
+        derivationPath: wallet.derivationPath,
+        createdAt: options.createdAt || new Date().toISOString(),
+    };
+    const ciphertext = await cryptoApi.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        textEncoder.encode(JSON.stringify(payload))
+    );
+
+    await keyStore.put(key);
+    storage.setItem(SESSION_WALLET_STORAGE_KEY, JSON.stringify({
+        version: 1,
+        address: wallet.address,
+        derivationPath: wallet.derivationPath,
+        iv: bytesToBase64(iv),
+        ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
+    }));
+
+    return {
+        address: wallet.address,
+        derivationPath: wallet.derivationPath,
+    };
+};
+
+export const restoreSessionWallet = async (options = {}) => {
+    const cryptoApi = getCrypto();
+    const storage = getSessionStorage(options.storage);
+    const keyStore = getSessionKeyStore(options.keyStore);
+    const raw = storage.getItem(SESSION_WALLET_STORAGE_KEY);
+    if (!raw) {
+        await keyStore.delete();
+        return null;
+    }
+
+    try {
+        const record = JSON.parse(raw);
+        if (!record || record.version !== 1) {
+            throw new Error('INVALID_SESSION_WALLET');
+        }
+        const key = await keyStore.get();
+        if (!key) {
+            storage.removeItem(SESSION_WALLET_STORAGE_KEY);
+            return null;
+        }
+        const plaintext = await cryptoApi.subtle.decrypt(
+            { name: 'AES-GCM', iv: base64ToBytes(record.iv || '') },
+            key,
+            base64ToBytes(record.ciphertext || '')
+        );
+        const payload = JSON.parse(textDecoder.decode(plaintext));
+        const wallet = deriveWalletFromMnemonic(payload.mnemonic);
+        if (record.address && wallet.address !== record.address) {
+            throw new Error('SESSION_WALLET_ADDRESS_MISMATCH');
+        }
+        return {
+            mnemonic: wallet.mnemonic,
+            wallet,
+        };
+    } catch (err) {
+        storage.removeItem(SESSION_WALLET_STORAGE_KEY);
+        await keyStore.delete();
+        throw err;
+    }
+};
+
+export const clearSessionWallet = async (options = {}) => {
+    const storage = getSessionStorage(options.storage);
+    const keyStore = getSessionKeyStore(options.keyStore);
+    storage.removeItem(SESSION_WALLET_STORAGE_KEY);
+    await keyStore.delete();
 };

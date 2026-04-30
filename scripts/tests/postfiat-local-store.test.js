@@ -149,9 +149,11 @@ test('wallet lock clears only the current wallet session', () => {
     const { LocalStore, sessionStorage } = loadLocalStore();
 
     LocalStore.walletLogin(undefined, 'wallet-block', 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+    sessionStorage.PFT_session_wallet = '{"version":1}';
     LocalStore.lockWallet();
 
     assert.equal(LocalStore.isWalletSession(), false);
     assert.equal(LocalStore.isLoggedIn(), false);
     assert.equal(sessionStorage[Constants.blockHashKey], undefined);
+    assert.equal(sessionStorage.PFT_session_wallet, undefined);
 });

@@ -7,9 +7,12 @@ import test from 'node:test';
 
 import {
     DEFAULT_DERIVATION_PATH,
+    SESSION_WALLET_STORAGE_KEY,
     WALLET_VAULT_STORAGE_KEY,
     clearSavedWallet,
+    clearSessionWallet,
     createMnemonic,
+    createSessionWallet,
     decryptMnemonicVault,
     deriveWalletFromMnemonic,
     encryptMnemonicVault,
@@ -18,6 +21,7 @@ import {
     messageToHex,
     normalizeMnemonic,
     saveWallet,
+    restoreSessionWallet,
     signMessage,
     unlockSavedWallet,
     verifyMessage,
@@ -35,6 +39,19 @@ const makeStorage = () => {
         getItem: (key) => values.get(key) || null,
         setItem: (key, value) => values.set(key, String(value)),
         removeItem: (key) => values.delete(key),
+    };
+};
+
+const makeKeyStore = () => {
+    let value = null;
+    return {
+        put: async (key) => {
+            value = key;
+        },
+        get: async () => value,
+        delete: async () => {
+            value = null;
+        },
     };
 };
 
@@ -121,4 +138,26 @@ test('saves, unlocks, and clears the browser wallet vault', async () => {
 
     clearSavedWallet(storage);
     assert.equal(storage.getItem(WALLET_VAULT_STORAGE_KEY), null);
+});
+
+test('stores an unlocked wallet in session-scoped encrypted storage', async () => {
+    const storage = makeStorage();
+    const keyStore = makeKeyStore();
+
+    const meta = await createSessionWallet(TEST_MNEMONIC, {
+        storage,
+        keyStore,
+        createdAt: '2026-04-30T00:00:00.000Z',
+    });
+
+    assert.equal(meta.address, TEST_ADDRESS);
+    assert.ok(storage.getItem(SESSION_WALLET_STORAGE_KEY));
+
+    const restored = await restoreSessionWallet({ storage, keyStore });
+    assert.equal(restored.mnemonic, TEST_MNEMONIC);
+    assert.equal(restored.wallet.address, TEST_ADDRESS);
+
+    await clearSessionWallet({ storage, keyStore });
+    assert.equal(storage.getItem(SESSION_WALLET_STORAGE_KEY), null);
+    assert.equal(await restoreSessionWallet({ storage, keyStore }), null);
 });
