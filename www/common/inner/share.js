@@ -17,6 +17,8 @@ define([
     '/components/nthen/index.js',
     '/customize/pages.js',
     '/common/common-icons.js',
+    '/common/postfiat-wallet-core.bundle.js',
+    '/common/postfiat-private-share.bundle.js',
 
     '/components/file-saver/FileSaver.min.js',
     '/lib/qrcode.min.js',
@@ -359,6 +361,201 @@ define([
         cb(void 0, {
             content: contactsContent,
             buttons: contactButtons
+        });
+    };
+
+    var getPostFiatRelays = function () {
+        var nostr = (ApiConfig.postFiat && ApiConfig.postFiat.nostr) || {};
+        var relays = Array.isArray(nostr.privateRelays) && nostr.privateRelays.length ?
+            nostr.privateRelays : nostr.relays;
+        return Array.isArray(relays) ? relays : [];
+    };
+
+    var parsePostFiatRelayInput = function (value) {
+        return String(value || '').split(/[\s,]+/u)
+            .map(function (relay) { return relay.trim(); })
+            .filter(Boolean);
+    };
+
+    var parsePostFiatRecipientInput = function (value, relays) {
+        var text = String(value || '').trim();
+        if (!text) { throw new Error('MISSING_POSTFIAT_RECIPIENT'); }
+        var recipient = text[0] === '{' ? JSON.parse(text) : { publicKeyHex: text };
+        if (!Array.isArray(recipient.relays) || !recipient.relays.length) {
+            recipient.relays = relays;
+        }
+        return recipient;
+    };
+
+    var getPostFiatShareMode = function (opts) {
+        if (!opts.$rights) { return 'edit'; }
+        return Util.isChecked(opts.$rights.find('#cp-share-editable-true')) ? 'edit' : 'view';
+    };
+
+    var getPostFiatSessionWallet = async function () {
+        var Core = window.PostFiatWalletCore;
+        if (!Core || typeof(Core.restoreSessionWallet) !== 'function') {
+            throw new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE');
+        }
+        var session = await Core.restoreSessionWallet();
+        if (!session || !session.mnemonic) {
+            throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
+        }
+        return session;
+    };
+
+    var getPostFiatTab = function (Env, data, opts, _cb) {
+        var cb = Util.once(Util.mkAsync(_cb));
+        var relays = getPostFiatRelays();
+        var ShareWorkflow = window.PostFiatPrivateShare;
+
+        var recipientInput = h('textarea.form-control#cp-share-pft-recipient', {
+            rows: 4,
+            spellcheck: false,
+            placeholder: 'Recipient Nostr pubkey or inbox JSON'
+        });
+        var relaysInput = h('textarea.form-control#cp-share-pft-relays', {
+            rows: 2,
+            spellcheck: false,
+            placeholder: 'wss://relay.example'
+        }, relays.join('\n'));
+        var ownDirectory = h('textarea.form-control#cp-share-pft-own-directory', {
+            rows: 4,
+            readonly: 'readonly',
+            spellcheck: false,
+            placeholder: 'Unlock wallet to load your inbox JSON'
+        });
+        var resultOutput = h('textarea.form-control#cp-share-pft-result', {
+            rows: 4,
+            readonly: 'readonly',
+            spellcheck: false,
+            placeholder: 'Publish result'
+        });
+        var status = h('div.cp-share-pft-status', { role: 'status' });
+        var content = h('div.cp-share-modal.cp-share-pft', [
+            h('label.cp-default-label', { for: 'cp-share-pft-recipient' }, 'Recipient'),
+            recipientInput,
+            h('div.cp-spacer'),
+            h('label.cp-default-label', { for: 'cp-share-pft-relays' }, 'Relays'),
+            relaysInput,
+            h('div.cp-spacer'),
+            h('label.cp-default-label', { for: 'cp-share-pft-own-directory' }, 'Your inbox'),
+            ownDirectory,
+            h('div.cp-spacer'),
+            h('label.cp-default-label', { for: 'cp-share-pft-result' }, 'Result'),
+            resultOutput,
+            status
+        ]);
+        var $content = $(content);
+
+        var setStatus = function (text, warning) {
+            $(status).text(text || '').toggleClass('alert alert-warning', Boolean(warning));
+        };
+
+        var loadOwnDirectory = async function () {
+            if (!ShareWorkflow || typeof(ShareWorkflow.buildOwnNostrInboxDirectory) !== 'function') {
+                throw new Error('POSTFIAT_SHARE_WORKFLOW_UNAVAILABLE');
+            }
+            var session = await getPostFiatSessionWallet();
+            var directory = await ShareWorkflow.buildOwnNostrInboxDirectory({
+                mnemonic: session.mnemonic,
+                postFiatConfig: ApiConfig.postFiat,
+                fallbackRelays: parsePostFiatRelayInput($(relaysInput).val()),
+                origin: opts.origin || window.location.origin
+            });
+            $(ownDirectory).val(JSON.stringify(directory, null, 2));
+            return directory;
+        };
+
+        setTimeout(function () {
+            loadOwnDirectory().catch(function () {
+                setStatus('Unlock your Post Fiat wallet to publish wallet shares.', true);
+            });
+        });
+
+        cb(void 0, {
+            content: content,
+            buttons: [
+                makeCancelButton(),
+                {
+                    className: 'secondary cp-share-pft-copy-inbox',
+                    name: 'Copy inbox',
+                    iconClass: 'copy',
+                    onClick: function () {
+                        setStatus('Loading inbox...');
+                        loadOwnDirectory().then(function (directory) {
+                            Clipboard.copy(JSON.stringify(directory, null, 2), function (err) {
+                                if (err) {
+                                    setStatus('Unable to copy inbox.', true);
+                                    return void UI.warn(Messages.error);
+                                }
+                                setStatus('Inbox copied.');
+                                UI.log(Messages.shareSuccess);
+                            });
+                        }).catch(function (err) {
+                            setStatus(err.message || String(err), true);
+                            UI.warn('Unlock your Post Fiat wallet first.');
+                        });
+                        return true;
+                    },
+                    keys: []
+                }, {
+                    className: 'primary cp-nobar cp-share-pft-publish',
+                    name: 'Share to wallet',
+                    iconClass: 'share',
+                    onClick: function () {
+                        if (!ShareWorkflow || typeof(ShareWorkflow.publishLivePadPrivateShare) !== 'function') {
+                            UI.warn('Post Fiat private sharing code is unavailable.');
+                            return true;
+                        }
+                        var $button = $('.alertify').find('button.cp-share-pft-publish');
+                        var relayList = parsePostFiatRelayInput($(relaysInput).val());
+                        opts.saveValue();
+                        var href = opts.getLinkValue();
+                        if (!/^(\/|https?:\/\/)/u.test(String(href || ''))) {
+                            setStatus('Generate a valid document link before publishing.', true);
+                            return true;
+                        }
+                        $button.attr('disabled', 'disabled');
+                        setStatus('Publishing...');
+                        getPostFiatSessionWallet().then(function (session) {
+                            var recipient = parsePostFiatRecipientInput($(recipientInput).val(), relayList);
+                            return ShareWorkflow.publishLivePadPrivateShare({
+                                senderMnemonic: session.mnemonic,
+                                recipientDirectory: recipient,
+                                postFiatConfig: ApiConfig.postFiat,
+                                fallbackRelays: relayList,
+                                origin: opts.origin || window.location.origin,
+                                href: href,
+                                title: opts.title || data.title || document.title,
+                                mode: getPostFiatShareMode(opts),
+                                timeoutMs: 10000
+                            });
+                        }).then(function (published) {
+                            var accepted = published.publishResults.filter(function (r) {
+                                return r.accepted;
+                            }).length;
+                            $content.find('#cp-share-pft-result').val(JSON.stringify({
+                                eventId: published.giftWrap.id,
+                                relays: published.relays,
+                                publishResults: published.publishResults
+                            }, null, 2));
+                            setStatus(accepted ?
+                                'Published to ' + accepted + ' relay(s).' :
+                                'No relay accepted the share.', !accepted);
+                            if (accepted) { UI.log(Messages.shareSuccess); }
+                            else { UI.warn('No relay accepted the Post Fiat share.'); }
+                        }).catch(function (err) {
+                            setStatus(err.message || String(err), true);
+                            UI.warn('Unable to publish Post Fiat share.');
+                        }).finally(function () {
+                            $button.removeAttr('disabled');
+                        });
+                        return true;
+                    },
+                    keys: [13]
+                }
+            ]
         });
     };
 
@@ -845,8 +1042,15 @@ define([
         };
         if (opts.static) { $rights.hide(); }
 
-        var contactsActive = hasFriends && !priv.offline;
-        var tabs = [{
+        var pftSharingActive = Boolean(ApiConfig.postFiat);
+        var contactsActive = !pftSharingActive && hasFriends && !priv.offline;
+        var tabs = [pftSharingActive ? {
+            getTab: getPostFiatTab,
+            title: 'Post Fiat',
+            icon: 'share',
+            active: true,
+            onHide: resetTab
+        } : undefined, {
             getTab: getContactsTab,
             title: Messages.share_contactCategory,
             icon: "contacts",
@@ -857,7 +1061,7 @@ define([
             getTab: getLinkTab,
             title: Messages.share_linkCategory,
             icon: "link",
-            active: !contactsActive,
+            active: !contactsActive && !pftSharingActive,
         }, window.CP_DEV_MODE ? { // NEXT enable for all
             getTab: getQRTab,
             title: Messages.share_QRCategory,

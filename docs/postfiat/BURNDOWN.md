@@ -64,12 +64,13 @@ Status values:
 - [x] Define a PFT wallet directory record: wallet address -> Nostr public key -> preferred relay set.
 - [x] Add Nostr relay config, including PFT-operated default relays and user/private relay overrides.
 - [x] Package pad capability secrets as a canonical live-pad share payload.
-- [~] Encrypt live-pad share payloads with NIP-44 and wrap/deliver them with NIP-59/NIP-17 style private events.
-- [ ] Add "Share to wallet" as the primary share action in the CryptPad share modal.
+- [x] Encrypt live-pad share payloads with NIP-44 and wrap/deliver them with NIP-59/NIP-17 style private events.
+- [~] Add "Share to wallet" as the primary share action in the CryptPad share modal.
 - [ ] Add "Shared with me" inbox based on encrypted Nostr relay messages, not on-chain pointer scans.
 - [ ] Let recipient import/open a received live pad from the private inbox.
 - [x] Add UI-ready workflow helpers that publish and open live-pad private shares from PFT wallet mnemonics.
 - [x] Bundle the private-share workflow for browser use.
+- [x] Let the browser share workflow accept a recipient Nostr pubkey plus relay list before full wallet-directory discovery exists.
 - [ ] Add peer chat/replies around shared documents using the same encrypted relay channel.
 - [ ] Keep raw CryptPad link copy available as an advanced/legacy action.
 - [ ] Add e2e test: wallet A creates pad, shares privately to wallet B via Nostr relay, wallet B opens it.
@@ -96,7 +97,7 @@ Status values:
 - [ ] Replace drive styling with a modern document workspace.
 - [ ] Add wallet account panel, balance/network state, and key publication state.
 - [ ] Add wallet contacts/address book.
-- [ ] Add PFT-native share modal.
+- [~] Add PFT-native share modal.
 - [ ] Review mobile layout for drive, editor, wallet unlock, and share flows.
 - [ ] Remove fragile repeated CSS timeout injection from previous prototypes.
 - [ ] Add screenshot regression checks for desktop and mobile.
@@ -136,7 +137,7 @@ Status values:
 ## Immediate Next Tasks
 
 1. Add browser e2e tests for wallet-first login, saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
-2. Wire `window.PostFiatPrivateShare` into a real share-to-wallet modal.
-3. Add a private "Shared with me" Nostr inbox before adding any on-chain/IPFS pointer inbox.
-4. Add browser-level integration tests against a local or fake Nostr relay.
+2. Add a private "Shared with me" Nostr inbox before adding any on-chain/IPFS pointer inbox.
+3. Add browser-level integration tests against a local or fake Nostr relay.
+4. Add wallet/contact directory discovery so users do not paste raw pubkeys or inbox JSON.
 5. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.

@@ -13,7 +13,9 @@ import {
 } from '../../src/postfiat/nostr-identity.mjs';
 import {
     buildLivePadPrivateShare,
+    buildOwnNostrInboxDirectory,
     fetchAndOpenLivePadPrivateShares,
+    normalizePrivateShareRecipient,
     openLivePadPrivateShare,
     publishLivePadPrivateShare,
     selectPrivateShareRelays,
@@ -92,6 +94,56 @@ test('selects recipient relays before instance relay fallbacks', async () => {
             },
         },
     }), ['wss://private.example']);
+});
+
+test('accepts pubkey-only private share recipients with configured relay fallback', async () => {
+    const identity = await deriveNostrIdentityFromMnemonic(RECIPIENT_MNEMONIC, {
+        origin: ORIGIN,
+    });
+    const recipient = normalizePrivateShareRecipient(identity.publicKeyHex);
+
+    assert.deepEqual(recipient, {
+        publicKeyHex: identity.publicKeyHex,
+        relays: [],
+    });
+
+    const built = await buildLivePadPrivateShare({
+        senderMnemonic: SENDER_MNEMONIC,
+        recipientDirectory: {
+            publicKeyHex: identity.publicKeyHex,
+            relays: [],
+        },
+        postFiatConfig: {
+            nostr: {
+                privateRelays: ['wss://instance-relay.example/'],
+            },
+        },
+        origin: ORIGIN,
+        href: '/pad/#/2/pad/edit/example/',
+        title: 'Relay fallback share',
+        mode: 'view',
+    });
+
+    assert.equal(built.recipient.publicKeyHex, identity.publicKeyHex);
+    assert.equal(built.recipient.walletAddress, undefined);
+    assert.deepEqual(built.relays, ['wss://instance-relay.example']);
+});
+
+test('builds an own inbox directory from the current wallet mnemonic', async () => {
+    const directory = await buildOwnNostrInboxDirectory({
+        mnemonic: RECIPIENT_MNEMONIC,
+        postFiatConfig: {
+            nostr: {
+                privateRelays: ['wss://private.example'],
+            },
+        },
+        origin: ORIGIN,
+        createdAt: '2026-04-30T00:00:00.000Z',
+    });
+
+    assert.equal(directory.kind, 'postfiat-nostr-inbox');
+    assert.equal(directory.walletAddress, 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV');
+    assert.deepEqual(directory.relays, ['wss://private.example']);
 });
 
 test('builds and opens a live-pad private share from PFT wallet mnemonics', async () => {

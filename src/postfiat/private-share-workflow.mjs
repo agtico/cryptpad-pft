@@ -8,6 +8,7 @@ import {
 import {
     buildNostrInboxDirectoryRecord,
     deriveNostrIdentityFromMnemonic,
+    normalizeNostrPublicKeyHex,
     normalizeNostrRelayList,
     parseNostrInboxDirectoryRecord,
 } from './nostr-identity.mjs';
@@ -20,11 +21,31 @@ import {
     publishNostrEventToRelays,
 } from './nostr-relay-client.mjs';
 
+export const normalizePrivateShareRecipient = (record) => {
+    const parsed = typeof record === 'string' ? (() => {
+        const text = record.trim();
+        if (text.startsWith('{')) {
+            return JSON.parse(text);
+        }
+        return { publicKeyHex: text };
+    })() : record;
+    if (parsed?.kind) {
+        return parseNostrInboxDirectoryRecord(parsed);
+    }
+    if (parsed?.walletAddress) {
+        return buildNostrInboxDirectoryRecord(parsed);
+    }
+    return {
+        publicKeyHex: normalizeNostrPublicKeyHex(parsed?.publicKeyHex || parsed?.pubkey),
+        relays: normalizeNostrRelayList(parsed?.relays || []),
+    };
+};
+
 const normalizeDirectoryRecord = (record) => {
     if (record?.kind) {
         return parseNostrInboxDirectoryRecord(record);
     }
-    return buildNostrInboxDirectoryRecord(record);
+    return normalizePrivateShareRecipient(record);
 };
 
 export const selectPrivateShareRelays = ({
@@ -103,6 +124,27 @@ export const buildLivePadPrivateShare = async ({
         payload,
         ...wrapped,
     };
+};
+
+export const buildOwnNostrInboxDirectory = async ({
+    mnemonic,
+    postFiatConfig,
+    fallbackRelays,
+    origin,
+    createdAt,
+} = {}) => {
+    const identity = await deriveNostrIdentityFromMnemonic(mnemonic, { origin });
+    const relays = selectPrivateShareRelays({
+        recipientDirectory: { relays: [] },
+        postFiatConfig,
+        fallbackRelays,
+    });
+    return buildNostrInboxDirectoryRecord({
+        walletAddress: identity.walletAddress,
+        publicKeyHex: identity.publicKeyHex,
+        relays,
+        createdAt,
+    });
 };
 
 export const publishLivePadPrivateShare = async (options = {}) => {

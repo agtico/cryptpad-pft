@@ -33,8 +33,9 @@ Implemented so far:
 - `src/postfiat/live-pad-share.mjs`: canonical plaintext envelope for packaging live CryptPad pad capabilities before encrypted Nostr delivery, plus explicit durable PFTL envelope plumbing.
 - `src/postfiat/nostr-private-share.mjs`: NIP-44 v2 encryption/decryption, NIP-01 event signing/verification, and NIP-59-style seal/gift-wrap helpers for private live-pad shares.
 - `src/postfiat/nostr-relay-client.mjs`: relay WebSocket helpers for publishing gift wraps and fetching recipient inbox gift wraps.
-- `src/postfiat/private-share-workflow.mjs`: UI-ready workflow that derives sender/recipient Nostr identity from PFT mnemonics, selects recipient/config relays, publishes private live-pad shares, and opens fetched shares.
+- `src/postfiat/private-share-workflow.mjs`: UI-ready workflow that derives sender/recipient Nostr identity from PFT mnemonics, selects recipient/config relays, accepts full recipient directory records or raw recipient Nostr pubkeys, publishes private live-pad shares, and opens fetched shares.
 - `www/common/postfiat-private-share.bundle.js`: browser IIFE bundle exposing the private-share workflow as `window.PostFiatPrivateShare`.
+- `www/common/inner/share.js`: Post Fiat is now the primary share tab when `postFiat` config is present; it copies the current wallet inbox JSON and publishes live-pad gift wraps to relay(s).
 - `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, wallet session storage, key registry parsing, Nostr identity/directory records, NIP-44/NIP-59 wrapping, relay publish/fetch helpers, full private-share workflow, and live-pad share payloads.
 
 Architecture pivot to preserve privacy:
@@ -62,9 +63,9 @@ Use these local repos as references:
 ## Recommended Implementation Order
 
 1. Add browser e2e coverage for wallet-first login, seed login, saved-wallet unlock, session lock, and drive recovery.
-2. Wire `window.PostFiatPrivateShare` into a real share-to-wallet modal.
-3. Build the private "Shared with me" Nostr inbox before any on-chain/IPFS pointer inbox.
-4. Add browser-level integration tests against a local or fake Nostr relay.
+2. Build the private "Shared with me" Nostr inbox before any on-chain/IPFS pointer inbox.
+3. Add browser-level integration tests against a local or fake Nostr relay, including the new share-modal tab.
+4. Add wallet/contact directory discovery so users do not paste raw pubkeys or inbox JSON.
 5. Keep PFTL/IPFS durable publishing behind explicit UX and privacy warnings.
 
 ## Key Technical Decisions Already Made
