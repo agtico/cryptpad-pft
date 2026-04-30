@@ -10,8 +10,57 @@ import { Wallet } from 'xrpl';
 export const DEFAULT_DERIVATION_PATH = "m/44'/144'/0'/0/0";
 export const DEFAULT_WORD_COUNT = 24;
 export const DEFAULT_ENTROPY_BITS = 256;
+export const WALLET_VAULT_STORAGE_KEY = 'PFT_wallet_vault';
+export const WALLET_VAULT_KDF_ITERATIONS = 250000;
+export const WALLET_VAULT_SALT_BYTES = 16;
+export const WALLET_VAULT_IV_BYTES = 12;
 
 const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
+const getCrypto = () => {
+    const cryptoApi = globalThis.crypto;
+    if (!cryptoApi?.subtle || typeof cryptoApi.getRandomValues !== 'function') {
+        throw new Error('WEB_CRYPTO_UNAVAILABLE');
+    }
+    return cryptoApi;
+};
+
+const getStorage = (storage) => {
+    if (storage) { return storage; }
+    if (globalThis.localStorage) { return globalThis.localStorage; }
+    throw new Error('LOCAL_STORAGE_UNAVAILABLE');
+};
+
+export const bytesToBase64 = (bytes) => {
+    const normalized = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    if (typeof btoa === 'function') {
+        let binary = '';
+        for (let i = 0; i < normalized.length; i += 1) {
+            binary += String.fromCharCode(normalized[i]);
+        }
+        return btoa(binary);
+    }
+    if (typeof Buffer !== 'undefined') {
+        return Buffer.from(normalized).toString('base64');
+    }
+    throw new Error('BASE64_UNAVAILABLE');
+};
+
+export const base64ToBytes = (value) => {
+    if (typeof atob === 'function') {
+        const binary = atob(value);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+    }
+    if (typeof Buffer !== 'undefined') {
+        return new Uint8Array(Buffer.from(value, 'base64'));
+    }
+    throw new Error('BASE64_UNAVAILABLE');
+};
 
 export const normalizeMnemonic = (mnemonic) =>
     String(mnemonic || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -64,4 +113,150 @@ export const verifyMessage = ({ message, signature, publicKey, address }) => {
         return false;
     }
     return keypairs.verify(messageToHex(message), signature, publicKey);
+};
+
+const deriveVaultKey = async ({ password, salt, iterations }) => {
+    if (!password) {
+        throw new Error('MISSING_WALLET_PASSWORD');
+    }
+    const cryptoApi = getCrypto();
+    const keyMaterial = await cryptoApi.subtle.importKey(
+        'raw',
+        textEncoder.encode(password),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+    );
+
+    return cryptoApi.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt,
+            iterations,
+            hash: 'SHA-256',
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+};
+
+export const encryptMnemonicVault = async ({ password, mnemonic, iterations, createdAt } = {}) => {
+    const wallet = deriveWalletFromMnemonic(mnemonic);
+    const normalizedIterations = iterations || WALLET_VAULT_KDF_ITERATIONS;
+    const cryptoApi = getCrypto();
+    const salt = cryptoApi.getRandomValues(new Uint8Array(WALLET_VAULT_SALT_BYTES));
+    const iv = cryptoApi.getRandomValues(new Uint8Array(WALLET_VAULT_IV_BYTES));
+    const key = await deriveVaultKey({ password, salt, iterations: normalizedIterations });
+    const payload = {
+        mnemonic: wallet.mnemonic,
+        address: wallet.address,
+        derivationPath: wallet.derivationPath,
+    };
+    const ciphertext = await cryptoApi.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        textEncoder.encode(JSON.stringify(payload))
+    );
+
+    return {
+        version: 1,
+        address: wallet.address,
+        derivationPath: wallet.derivationPath,
+        createdAt: createdAt || new Date().toISOString(),
+        kdf: {
+            name: 'PBKDF2',
+            hash: 'SHA-256',
+            iterations: normalizedIterations,
+            salt: bytesToBase64(salt),
+        },
+        cipher: {
+            name: 'AES-GCM',
+            iv: bytesToBase64(iv),
+        },
+        ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
+    };
+};
+
+export const decryptMnemonicVault = async ({ password, record } = {}) => {
+    if (!record || record.version !== 1) {
+        throw new Error('INVALID_WALLET_VAULT');
+    }
+    const cryptoApi = getCrypto();
+    const salt = base64ToBytes(record.kdf?.salt || '');
+    const iv = base64ToBytes(record.cipher?.iv || '');
+    const ciphertext = base64ToBytes(record.ciphertext || '');
+    const key = await deriveVaultKey({
+        password,
+        salt,
+        iterations: record.kdf?.iterations || WALLET_VAULT_KDF_ITERATIONS,
+    });
+    const plaintext = await cryptoApi.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        ciphertext
+    );
+    const payload = JSON.parse(textDecoder.decode(plaintext));
+    const wallet = deriveWalletFromMnemonic(payload.mnemonic);
+    if (record.address && wallet.address !== record.address) {
+        throw new Error('WALLET_VAULT_ADDRESS_MISMATCH');
+    }
+    return wallet.mnemonic;
+};
+
+export const getSavedWalletRecord = (storage) => {
+    const store = getStorage(storage);
+    const raw = store.getItem(WALLET_VAULT_STORAGE_KEY);
+    if (!raw) { return null; }
+    return JSON.parse(raw);
+};
+
+export const getSavedWalletMeta = (storage) => {
+    const record = getSavedWalletRecord(storage);
+    if (!record) { return null; }
+    return {
+        version: record.version,
+        address: record.address,
+        derivationPath: record.derivationPath,
+        createdAt: record.createdAt,
+        kdf: record.kdf && {
+            name: record.kdf.name,
+            hash: record.kdf.hash,
+            iterations: record.kdf.iterations,
+        },
+    };
+};
+
+export const hasSavedWallet = (storage) => Boolean(getSavedWalletMeta(storage));
+
+export const saveWallet = async (password, mnemonic, options = {}) => {
+    const store = getStorage(options.storage);
+    const record = await encryptMnemonicVault({
+        password,
+        mnemonic,
+        iterations: options.iterations,
+        createdAt: options.createdAt,
+    });
+    store.setItem(WALLET_VAULT_STORAGE_KEY, JSON.stringify(record));
+    return getSavedWalletMeta(store);
+};
+
+export const unlockSavedWallet = async (password, options = {}) => {
+    const store = getStorage(options.storage);
+    const record = getSavedWalletRecord(store);
+    if (!record) {
+        throw new Error('NO_SAVED_WALLET');
+    }
+    const mnemonic = await decryptMnemonicVault({ password, record });
+    return {
+        mnemonic,
+        wallet: deriveWalletFromMnemonic(mnemonic),
+        meta: getSavedWalletMeta(store),
+    };
+};
+
+export const clearSavedWallet = (storage) => {
+    const store = getStorage(storage);
+    store.removeItem(WALLET_VAULT_STORAGE_KEY);
 };

@@ -105,37 +105,104 @@ define([
         });
 
         var $walletMnemonic = $('#pft-mnemonic');
-        var walletLogin = function () {
+        var $walletPassword = $('#pft-wallet-password');
+        var $savePassword = $('#pft-save-password');
+        var $savedWallet = $('#pft-saved-wallet');
+        var $savedWalletAddress = $('#pft-saved-wallet-address');
+        var getWalletCore = function (quiet) {
             var Core = window.PostFiatWalletCore;
-            if (!Core) {
-                return void UI.warn('Post Fiat wallet code is unavailable.');
+            if (!Core && !quiet) {
+                UI.warn('Post Fiat wallet code is unavailable.');
+                return;
             }
+            return Core;
+        };
+        var refreshSavedWallet = function () {
+            var Core = getWalletCore(true);
+            if (!Core || !Core.getSavedWalletMeta) { return; }
+            try {
+                var meta = Core.getSavedWalletMeta();
+                if (!meta) {
+                    $savedWallet.addClass('cp-hidden');
+                    $savedWalletAddress.text('');
+                    return;
+                }
+                $savedWallet.removeClass('cp-hidden');
+                $savedWalletAddress.text(meta.address);
+            } catch (err) {
+                console.error(err);
+                $savedWallet.addClass('cp-hidden');
+            }
+        };
+        var loginWithMnemonic = function (Core, mnemonic, shouldImport) {
+            var wallet = Core.deriveWalletFromMnemonic(mnemonic);
+            var message = WalletAuth.getLoginMessage(wallet.address);
+            var signed = Core.signMessage(mnemonic, message);
+
+            Login.loginOrRegisterUI({
+                uname: wallet.address,
+                passwd: '',
+                shouldImport: shouldImport,
+                walletAuth: {
+                    address: wallet.address,
+                    publicKey: signed.publicKey,
+                    signature: signed.signature,
+                    message: message,
+                },
+                onOTP: UI.getOTPScreen
+            });
+        };
+        var walletLogin = async function () {
+            var Core = getWalletCore();
+            if (!Core) { return; }
 
             var mnemonic = $walletMnemonic.val();
-            var shouldImport = $checkImport[0].checked;
             try {
-                var wallet = Core.deriveWalletFromMnemonic(mnemonic);
-                var message = WalletAuth.getLoginMessage(wallet.address);
-                var signed = Core.signMessage(mnemonic, message);
-
-                Login.loginOrRegisterUI({
-                    uname: wallet.address,
-                    passwd: '',
-                    shouldImport: shouldImport,
-                    walletAuth: {
-                        address: wallet.address,
-                        publicKey: signed.publicKey,
-                        signature: signed.signature,
-                        message: message,
-                    },
-                    onOTP: UI.getOTPScreen
-                });
+                if ($('#pft-save-wallet')[0].checked) {
+                    var savePassword = $savePassword.val();
+                    if (!savePassword) {
+                        return void UI.warn('Enter a wallet password before saving.');
+                    }
+                    await Core.saveWallet(savePassword, mnemonic);
+                    refreshSavedWallet();
+                }
+                $walletMnemonic.val('');
+                loginWithMnemonic(Core, mnemonic, $checkImport[0].checked);
             } catch (err) {
                 console.error(err);
                 UI.warn('Invalid Post Fiat seed phrase.');
             }
         };
+        var savedWalletLogin = async function () {
+            var Core = getWalletCore();
+            if (!Core) { return; }
+
+            try {
+                var password = $walletPassword.val();
+                if (!password) {
+                    return void UI.warn('Enter your wallet password.');
+                }
+                var saved = await Core.unlockSavedWallet(password);
+                loginWithMnemonic(Core, saved.mnemonic, $checkImport[0].checked);
+            } catch (err) {
+                console.error(err);
+                UI.warn('Unable to unlock saved Post Fiat wallet.');
+            }
+        };
+        refreshSavedWallet();
         $('#pft-wallet-login').click(walletLogin);
+        $('#pft-unlock-wallet').click(savedWalletLogin);
+        $('#pft-forget-wallet').click(function () {
+            var Core = getWalletCore();
+            if (!Core) { return; }
+            Core.clearSavedWallet();
+            $walletPassword.val('');
+            refreshSavedWallet();
+        });
+        $walletPassword.on('keydown', function (e) {
+            if (e.which !== 13) { return; }
+            savedWalletLogin();
+        });
         $walletMnemonic.on('keydown', function (e) {
             if (e.which !== 13 || !(e.ctrlKey || e.metaKey)) { return; }
             walletLogin();

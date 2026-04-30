@@ -23,7 +23,7 @@ Status values:
 - [~] Port Task Node BIP39 wallet primitives into this fork as a browser module.
 - [x] Use `@scure/bip39` and XRPL `Wallet.fromMnemonic` with path `m/44'/144'/0'/0/0`.
 - [~] Implement create wallet, restore wallet, unlock wallet, lock wallet.
-- [ ] Store encrypted wallet payload with PBKDF2-SHA256/AES-GCM or a reviewed stronger KDF.
+- [x] Store encrypted wallet payload with PBKDF2-SHA256/AES-GCM.
 - [x] Keep wallet-derived CryptPad login capabilities in session storage only.
 - [ ] Use encrypted session-only unlocked mnemonic handling patterned after `pftasks/app/src/lib/wallet/session.js`.
 - [x] Add wallet signing helper for canonical Post Fiat login/access messages.
@@ -41,6 +41,7 @@ Status values:
 - [x] Prevent stale persisted wallet `Block_hash` values from silently auto-unlocking.
 - [ ] Decide migration behavior for old username/password users.
 - [~] Add wallet-login UI for create/restore/unlock.
+- [x] Add saved-wallet unlock path that avoids repeated seed paste.
 - [ ] Add server nonce session only where server authorization is needed.
 - [ ] Add e2e test: restore same 24-word seed in a new browser and recover same CryptPad drive.
 
@@ -117,9 +118,8 @@ Status values:
 
 ## Immediate Next Tasks
 
-1. Add encrypted wallet-at-rest storage and session restore.
-2. Add wallet creation/onboarding with a save-confirm step.
-3. Run a browser e2e test proving a fresh browser must unlock before opening the wallet drive.
-4. Run a browser e2e test proving the same 24-word seed recovers the same CryptPad drive.
-5. Implement a minimal share-to-wallet bridge that encrypts a CryptPad URL secret as a PFTL v3 document.
-6. Start the visual redesign of login/drive around the Post Fiat shell.
+1. Add wallet creation/onboarding with a save-confirm step.
+2. Add browser e2e tests for saved-wallet unlock, session lock, and drive recovery.
+3. Add proper in-session mnemonic/key handling for PFTL sharing operations.
+4. Implement a minimal share-to-wallet bridge that encrypts a CryptPad URL secret as a PFTL v3 document.
+5. Start the visual redesign of login/drive around the Post Fiat shell.

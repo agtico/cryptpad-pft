@@ -27,6 +27,7 @@ The fork now includes the first Post Fiat wallet login path:
 - Canonical Post Fiat login message signing.
 - Deterministic CryptPad account derivation from the wallet signature.
 - Minimal wallet login UI.
+- Optional encrypted saved-wallet unlock using PBKDF2-SHA256/AES-GCM.
 - Session-only wallet login capability storage so a wallet login does not leave a persistent CryptPad `Block_hash` in browser `localStorage`.
 
 Read these first:

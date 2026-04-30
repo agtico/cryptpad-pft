@@ -19,11 +19,12 @@ The fork now contains upstream CryptPad plus Post Fiat planning docs and the fir
 Implemented so far:
 
 - `src/postfiat/wallet-core.mjs`: Task Node style 24-word BIP39 mnemonic, XRPL wallet derivation, and message signing/verification.
+- `src/postfiat/wallet-core.mjs`: encrypted saved-wallet vault helpers using PBKDF2-SHA256 and AES-GCM.
 - `src/common/postfiat-wallet-auth.js`: canonical Post Fiat login/access messages plus wallet-signature-to-CryptPad-entropy derivation.
 - `www/common/common-login.js`: accepts `walletAuth` without breaking stock password login, uses wallet-derived entropy, preserves wallet address casing, and makes wallet login idempotent.
 - `www/common/outer/local-store.js`: wallet logins store CryptPad login capabilities in `sessionStorage` only and ignore stale persisted wallet-looking `Block_hash` values.
 - `www/common/postfiat-wallet-core.bundle.js`: browser bundle for mnemonic derivation and message signing.
-- `customize.dist/pages/login.js` and `www/login/main.js`: minimal 24-word seed phrase login form wired into `walletAuth`.
+- `customize.dist/pages/login.js` and `www/login/main.js`: minimal 24-word seed phrase login form, encrypted saved-wallet unlock, and `walletAuth` login.
 - `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, and wallet session storage.
 
 ## Do Not Re-Discover These First
@@ -42,9 +43,9 @@ Use these local repos as references:
 
 ## Recommended Implementation Order
 
-1. Add encrypted wallet-at-rest storage and session restore.
-2. Add wallet creation/onboarding with a save-confirm step.
-3. Add browser e2e coverage for wallet unlock, session lock, and drive recovery.
+1. Add wallet creation/onboarding with a save-confirm step.
+2. Add browser e2e coverage for seed login, saved-wallet unlock, session lock, and drive recovery.
+3. Add proper in-session mnemonic/key handling for PFTL sharing operations.
 4. Port PFTL key lookup/publication.
 5. Add share-to-wallet bridge for CryptPad URL secrets.
 6. Only then start native PFTL document integration and broad UI redesign.
@@ -58,6 +59,7 @@ Use these local repos as references:
 - Raw CryptPad URL sharing should be legacy/advanced, not the main PFT UX.
 - Revocation requires file-key/content rotation.
 - Wallet login should not leave a persistent CryptPad `Block_hash` in `localStorage`; it should unlock the current browser session only.
+- Saved wallet vaults are encrypted locally with PBKDF2-SHA256/AES-GCM; the vault unlock password is not a CryptPad password.
 
 ## Known Traps
 

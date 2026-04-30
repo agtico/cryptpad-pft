@@ -67,6 +67,32 @@ define([
                         ]),
                         h('div.cp-postfiat-wallet-login', [
                             h('div.cp-login-instance', 'Post Fiat wallet'),
+                            h('div#pft-saved-wallet.cp-hidden', [
+                                h('div.big-container', [
+                                    h('div.input-container', [
+                                        h('label.cp-default-label', { for: 'pft-wallet-password' }, 'Wallet password'),
+                                        h('input.form-control#pft-wallet-password', {
+                                            type: 'password',
+                                            name: 'pft-wallet-password',
+                                            autocomplete: 'current-password',
+                                        }),
+                                    ]),
+                                    h('div.input-container', [
+                                        h('label.cp-default-label', 'Saved wallet'),
+                                        h('div#pft-saved-wallet-address.form-control', {
+                                            tabindex: 0,
+                                        }),
+                                    ]),
+                                ]),
+                                h('div.extra', [
+                                    h('button#pft-unlock-wallet.btn.btn-primary', {
+                                        type: 'button',
+                                    }, 'Unlock wallet'),
+                                    h('button#pft-forget-wallet.btn.btn-secondary', {
+                                        type: 'button',
+                                    }, 'Forget'),
+                                ]),
+                            ]),
                             h('div.big-container', [
                                 h('div.input-container', [
                                     h('label.cp-default-label', { for: 'pft-mnemonic' }, '24-word seed phrase'),
@@ -79,11 +105,22 @@ define([
                                         rows: 3,
                                     }),
                                 ]),
+                                h('div.input-container', [
+                                    h('label.cp-default-label', { for: 'pft-save-password' }, 'New wallet password'),
+                                    h('input.form-control#pft-save-password', {
+                                        type: 'password',
+                                        name: 'pft-save-password',
+                                        autocomplete: 'new-password',
+                                    }),
+                                ]),
+                            ]),
+                            h('div.checkbox-container', [
+                                UI.createCheckbox('pft-save-wallet', 'Save encrypted wallet on this browser'),
                             ]),
                             h('div.extra', [
                                 h('button#pft-wallet-login.btn.btn-primary', {
                                     type: 'button',
-                                }, 'Log in with Post Fiat wallet'),
+                                }, 'Log in with seed'),
                             ]),
                         ]),
                     ]),
