@@ -21,14 +21,16 @@ define([
     if (window.top !== window) { return; }
     $(function () {
         var $checkImport = $('#import-recent');
-        if (LocalStore.isLoggedIn()) {
+        const forceStandardLogin = window.location.hash === "#standard-login";
+        const forceLegacyLogin = forceStandardLogin || window.location.hash === "#legacy-login";
+        const forceWalletVault = window.location.hash === "#wallet-vault";
+        const alreadyLoggedIn = LocalStore.isLoggedIn();
+        if (alreadyLoggedIn && !forceWalletVault) {
             // already logged in, redirect to drive
             document.location.href = '/drive/';
             return;
         }
 
-        const forceStandardLogin = window.location.hash === "#standard-login";
-        const forceLegacyLogin = forceStandardLogin || window.location.hash === "#legacy-login";
         const postFiat = Config.postFiat || {};
         const walletFirst = postFiat.walletFirst !== false;
         const legacyDisabled = postFiat.disableLegacyLogin === true;
@@ -128,6 +130,14 @@ define([
         var $generatedMnemonic = $('#pft-generated-mnemonic');
         var $generatedAddress = $('#pft-generated-wallet-address');
         var $generatedConfirm = $('#pft-generated-confirm');
+        if (forceWalletVault) {
+            $('#pft-wallet-login').text('Save wallet on this browser');
+            $('#pft-create-wallet').addClass('cp-hidden');
+            $('#pft-show-legacy-login').parent().addClass('cp-hidden');
+            $('#pft-legacy-login').addClass('cp-hidden');
+            $checkImport.closest('.checkbox-container').addClass('cp-hidden');
+            $saveWallet.prop('checked', true).prop('disabled', true);
+        }
         var getWalletCore = function (quiet) {
             var Core = window.PostFiatWalletCore;
             if (!Core && !quiet) {
@@ -191,6 +201,29 @@ define([
             await Core.saveWallet(savePassword, mnemonic);
             refreshSavedWallet();
         };
+        var redirectAfterVaultSetup = function () {
+            document.location.href = '/drive/';
+        };
+        var saveWalletVaultOnly = async function (Core, mnemonic) {
+            var wallet = Core.deriveWalletFromMnemonic(mnemonic);
+            var accountName = LocalStore.getAccountName && LocalStore.getAccountName();
+            var savePassword = $savePassword.val();
+
+            if (accountName && accountName !== wallet.address) {
+                throw new Error('WALLET_ACCOUNT_MISMATCH');
+            }
+            if (!savePassword) {
+                throw new Error('MISSING_SAVE_PASSWORD');
+            }
+
+            await Core.saveWallet(savePassword, wallet.mnemonic);
+            if (Core.createSessionWallet) {
+                await Core.createSessionWallet(wallet.mnemonic);
+            }
+            refreshSavedWallet();
+            UI.log('Post Fiat wallet saved on this browser.');
+            redirectAfterVaultSetup();
+        };
         var createWallet = function () {
             var Core = getWalletCore();
             if (!Core) { return; }
@@ -214,11 +247,18 @@ define([
 
             var mnemonic = $walletMnemonic.val();
             try {
+                if (forceWalletVault && alreadyLoggedIn) {
+                    await saveWalletVaultOnly(Core, mnemonic);
+                    return;
+                }
                 await saveMnemonicIfRequested(Core, mnemonic);
                 $walletMnemonic.val('');
                 await loginWithMnemonic(Core, mnemonic, $checkImport[0].checked);
             } catch (err) {
                 console.error(err);
+                if (err.message === 'WALLET_ACCOUNT_MISMATCH') {
+                    return void UI.warn('This seed phrase does not match the logged-in wallet account.');
+                }
                 if (err.message === 'MISSING_SAVE_PASSWORD') {
                     return void UI.warn('Enter a wallet password before saving.');
                 }
@@ -234,6 +274,10 @@ define([
                 return void UI.warn('Confirm that you saved the generated seed phrase.');
             }
             try {
+                if (forceWalletVault && alreadyLoggedIn) {
+                    await saveWalletVaultOnly(Core, mnemonic);
+                    return;
+                }
                 await saveMnemonicIfRequested(Core, mnemonic);
                 $generatedMnemonic.val('');
                 $generatedAddress.text('');
@@ -241,6 +285,9 @@ define([
                 await loginWithMnemonic(Core, mnemonic, $checkImport[0].checked);
             } catch (err) {
                 console.error(err);
+                if (err.message === 'WALLET_ACCOUNT_MISMATCH') {
+                    return void UI.warn('This generated wallet does not match the logged-in wallet account.');
+                }
                 if (err.message === 'MISSING_SAVE_PASSWORD') {
                     return void UI.warn('Enter a wallet password before saving.');
                 }
@@ -257,6 +304,14 @@ define([
                     return void UI.warn('Enter your wallet password.');
                 }
                 var saved = await Core.unlockSavedWallet(password);
+                if (forceWalletVault && alreadyLoggedIn) {
+                    if (Core.createSessionWallet) {
+                        await Core.createSessionWallet(saved.mnemonic);
+                    }
+                    UI.log('Post Fiat wallet unlocked.');
+                    redirectAfterVaultSetup();
+                    return;
+                }
                 await loginWithMnemonic(Core, saved.mnemonic, $checkImport[0].checked);
             } catch (err) {
                 console.error(err);

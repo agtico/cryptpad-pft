@@ -698,7 +698,7 @@ define([
             $(unlockSavedButton).click();
         });
         $(openLoginButton).on('click', function () {
-            common.openURL('/login/');
+            common.openURL('/login/#wallet-vault');
         });
         $(switchWalletButton).on('click', function () {
             try {

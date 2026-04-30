@@ -15,11 +15,15 @@ define([
         const ssoLength = Config?.sso?.list?.length;
         const forceStandardLogin = window.location.hash === "#standard-login";
         const forceLegacyLogin = forceStandardLogin || window.location.hash === "#legacy-login";
+        const forceWalletVault = window.location.hash === "#wallet-vault";
         const postFiat = Config.postFiat || {};
         const walletFirst = postFiat.walletFirst !== false;
         const legacyDisabled = postFiat.disableLegacyLogin === true;
-        var legacyHidden = (legacyDisabled || (walletFirst && !forceLegacyLogin)) ? '.cp-hidden' : '';
-        var legacyToggleHidden = (!walletFirst || legacyDisabled || forceLegacyLogin) ? '.cp-hidden' : '';
+        var legacyHidden = (forceWalletVault || legacyDisabled ||
+            (walletFirst && !forceLegacyLogin)) ? '.cp-hidden' : '';
+        var legacyToggleHidden = (forceWalletVault || !walletFirst ||
+            legacyDisabled || forceLegacyLogin) ? '.cp-hidden' : '';
+        var importRecentHidden = forceWalletVault ? '.cp-hidden' : '';
         var ssoEnabled = (ssoLength && !forceStandardLogin) ? '': '.cp-hidden';
         var ssoEnforced = (Config?.sso?.force && !forceStandardLogin) ? '.cp-hidden' : '';
         if (ssoLength === 1 && ssoEnforced) {
@@ -30,7 +34,8 @@ define([
         return [h('div#cp-main', [
             Pages.infopageTopbar(),
             h('div.container.cp-container', [
-                h('div.row.cp-page-title', h('h1', Msg.login_login)),
+                h('div.row.cp-page-title', h('h1', forceWalletVault ?
+                    'Post Fiat wallet vault' : Msg.login_login)),
                 h('div.row', [
                     h('div.col-md-3'+ssoEnforced),
                     h('div#userForm.form-group.col-md-6'+ssoEnforced, [
@@ -134,7 +139,7 @@ define([
                                 }, 'Log in with seed'),
                             ]),
                         ]),
-                        h('div.checkbox-container', [
+                        h('div.checkbox-container' + importRecentHidden, [
                             UI.createCheckbox('import-recent', Msg.register_importRecent),
                         ]),
                         h('div.extra'+legacyToggleHidden, [
