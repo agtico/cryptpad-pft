@@ -40,6 +40,7 @@ Implemented so far:
 - `www/common/inner/share.js`: Post Fiat is now the primary share tab when `postFiat` config is present; it copies the current wallet inbox JSON and publishes live-pad gift wraps to relay(s).
 - `www/common/drive-ui.js`: Drive now has a first-pass "Shared with me" Post Fiat inbox button that fetches/decrypts relay gift wraps and lets users open or save received pad links.
 - `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, wallet session storage, key registry parsing, Nostr identity/directory records, NIP-44/NIP-59 wrapping, relay publish/fetch helpers, full private-share workflow, and live-pad share payloads.
+- `docs/postfiat/UX_SPEC.md`: target Post Fiat Docs product UX, including the `/app/` shell, document workspace, editor shell, share-to-wallet flow, inbox, contacts, durable publishing, mobile layout, and UX implementation burndown.
 
 Architecture pivot to preserve privacy:
 
@@ -68,8 +69,9 @@ Use these local repos as references:
 1. Add browser e2e coverage for wallet-first login, seed login, saved-wallet unlock, session lock, and drive recovery.
 2. Add browser-level integration tests against a local or fake Nostr relay, including the share-modal tab and Drive inbox.
 3. Add browser e2e coverage for wallet-directory publish/fetch and share-by-wallet-address.
-4. Improve the first-pass Post Fiat share/inbox UI styling and mobile layout.
-5. Keep PFTL/IPFS durable publishing behind explicit UX and privacy warnings.
+4. Start the UX migration with `/app/`: Post Fiat shell, wallet badge, document list, and redirect wallet login away from stock `/drive/`.
+5. Replace the modal-based share experience with the dedicated `Share to wallet` sheet from `docs/postfiat/UX_SPEC.md`.
+6. Keep PFTL/IPFS durable publishing behind explicit UX and privacy warnings.
 
 ## Key Technical Decisions Already Made
 
