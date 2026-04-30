@@ -158,7 +158,8 @@ define([
                 '/common/user-object.js',
                 'optional!/api/instance',
                 '/common/pad-types.js',
-                '/form/command-handler.js'
+                '/form/command-handler.js',
+                '/common/postfiat-wallet-core.bundle.js'
             ], waitFor(function (_CpNfOuter, _Cryptpad, _Crypto, _Cryptget, _SFrameChannel,
             _SecureIframe, _UnsafeIframe, _OOIframe, _Notifier, _Hash, _Util, _Realtime, _Notify,
             _Constants, _Feedback, _LocalStore, _Block, _Cache, _AppConfig, /* _Test,*/ _UserObject,
@@ -236,6 +237,13 @@ define([
                 };
 
                 var addFirstHandlers = () => {
+                    var startPostFiatWalletResponder = function () {
+                        var Core = window.PostFiatWalletCore;
+                        if (Core && typeof(Core.startSessionWalletResponder) === 'function') {
+                            Core.startSessionWalletResponder();
+                        }
+                    };
+                    startPostFiatWalletResponder();
                     sframeChan.on('Q_SETTINGS_CHECK_PASSWORD', function (data, cb) {
                         var blockHash = Utils.LocalStore.getBlockHash();
                         var userHash = Utils.LocalStore.getUserHash();
@@ -274,6 +282,72 @@ define([
                         var cb = Utils.Util.mkAsync(_cb);
                         cb({
                             seed: Utils.LocalStore.getSSOSeed()
+                        });
+                    });
+                    sframeChan.on('Q_POSTFIAT_WALLET_SESSION', function (obj, _cb) {
+                        var cb = Utils.Util.mkAsync(_cb);
+                        var Core = window.PostFiatWalletCore;
+                        var isWalletAddress = function (value) {
+                            return /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/u.test(String(value || '').trim());
+                        };
+                        var accountName = Utils.LocalStore.getAccountName();
+
+                        if (!Core || typeof(Core.restoreSessionWallet) !== 'function') {
+                            return void cb({
+                                state: false,
+                                error: 'POSTFIAT_WALLET_CORE_UNAVAILABLE',
+                                accountName: accountName,
+                                walletSession: Utils.LocalStore.isWalletSession &&
+                                    Utils.LocalStore.isWalletSession()
+                            });
+                        }
+
+                        Promise.resolve().then(function () {
+                            return Core.restoreSessionWallet();
+                        }).then(function (session) {
+                            if (session || typeof(Core.requestSessionWallet) !== 'function') {
+                                return session;
+                            }
+                            return Core.requestSessionWallet({ timeoutMs: 1200 });
+                        }).then(function (session) {
+                            if (!session || !session.mnemonic || !session.wallet) {
+                                return cb({
+                                    state: false,
+                                    error: 'POSTFIAT_WALLET_SESSION_REQUIRED',
+                                    accountName: accountName,
+                                    walletSession: Utils.LocalStore.isWalletSession &&
+                                        Utils.LocalStore.isWalletSession()
+                                });
+                            }
+                            if (isWalletAddress(accountName) && session.wallet.address !== accountName) {
+                                return cb({
+                                    state: false,
+                                    error: 'POSTFIAT_WALLET_ACCOUNT_MISMATCH',
+                                    accountName: accountName,
+                                    walletAddress: session.wallet.address,
+                                    walletSession: Utils.LocalStore.isWalletSession &&
+                                        Utils.LocalStore.isWalletSession()
+                                });
+                            }
+                            startPostFiatWalletResponder();
+                            cb({
+                                state: true,
+                                mnemonic: session.mnemonic,
+                                wallet: {
+                                    address: session.wallet.address,
+                                    publicKey: session.wallet.publicKey,
+                                    derivationPath: session.wallet.derivationPath
+                                }
+                            });
+                        }).catch(function (err) {
+                            console.error(err);
+                            cb({
+                                state: false,
+                                error: (err && err.message) || 'POSTFIAT_WALLET_SESSION_REQUIRED',
+                                accountName: accountName,
+                                walletSession: Utils.LocalStore.isWalletSession &&
+                                    Utils.LocalStore.isWalletSession()
+                            });
                         });
                     });
                     Cryptpad.loading.onMissingMFAEvent.reg((data) => {

@@ -427,7 +427,53 @@ define([
         return Core;
     };
 
-    var getPostFiatSessionWallet = async function () {
+    var requestOuterPostFiatSessionWallet = function (common) {
+        var Core = getPostFiatWalletCore();
+        if (!common || typeof(common.getSframeChannel) !== 'function') {
+            return Promise.resolve(null);
+        }
+        return new Promise(function (resolve, reject) {
+            var sframeChan = common.getSframeChannel();
+            if (!sframeChan || typeof(sframeChan.query) !== 'function') {
+                resolve(null);
+                return;
+            }
+            sframeChan.query('Q_POSTFIAT_WALLET_SESSION', null, function (err, obj) {
+                if (err) {
+                    console.error(err);
+                    resolve(null);
+                    return;
+                }
+                if (!obj || !obj.state || !obj.mnemonic) {
+                    if (obj && obj.error && obj.error !== 'POSTFIAT_WALLET_SESSION_REQUIRED') {
+                        reject(new Error(obj.error));
+                        return;
+                    }
+                    resolve(null);
+                    return;
+                }
+                try {
+                    var wallet = Core.deriveWalletFromMnemonic(obj.mnemonic);
+                    if (obj.wallet && obj.wallet.address && obj.wallet.address !== wallet.address) {
+                        throw new Error('POSTFIAT_WALLET_SESSION_MISMATCH');
+                    }
+                    Promise.resolve(Core.createSessionWallet(wallet.mnemonic)).then(function () {
+                        if (typeof(Core.startSessionWalletResponder) === 'function') {
+                            Core.startSessionWalletResponder();
+                        }
+                        resolve({
+                            mnemonic: wallet.mnemonic,
+                            wallet: wallet
+                        });
+                    }).catch(reject);
+                } catch (e) {
+                    reject(e);
+                }
+            }, { timeout: 3000 });
+        });
+    };
+
+    var getPostFiatSessionWallet = async function (common) {
         var Core = getPostFiatWalletCore();
         if (!Core || typeof(Core.restoreSessionWallet) !== 'function') {
             throw new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE');
@@ -435,6 +481,9 @@ define([
         var session = await Core.restoreSessionWallet();
         if (!session && typeof(Core.requestSessionWallet) === 'function') {
             session = await Core.requestSessionWallet({ timeoutMs: 1200 });
+        }
+        if (!session) {
+            session = await requestOuterPostFiatSessionWallet(common);
         }
         if (!session || !session.mnemonic) {
             throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
@@ -639,7 +688,7 @@ define([
             if (activePostFiatSession && activePostFiatSession.mnemonic) {
                 return activePostFiatSession;
             }
-            activePostFiatSession = await getPostFiatSessionWallet();
+            activePostFiatSession = await getPostFiatSessionWallet(common);
             return activePostFiatSession;
         };
         var renderContacts = function (contacts) {
@@ -757,7 +806,7 @@ define([
             setWalletUnlocked('');
             setWalletStatus('');
         });
-        refreshSavedWalletUnlock();
+        setWalletStatus('Checking wallet session...');
 
         setTimeout(function () {
             loadOwnDirectory().catch(function () {
