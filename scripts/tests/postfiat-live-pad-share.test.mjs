@@ -12,6 +12,8 @@ import {
     buildPftlContentEnvelope,
     buildPrivateShareEnvelope,
     parseLivePadSharePayload,
+    parsePrivateShareEnvelope,
+    serializePrivateShareEnvelope,
     serializeLivePadSharePayload,
 } from '../../src/postfiat/live-pad-share.mjs';
 
@@ -75,6 +77,14 @@ test('round-trips a Nostr private share envelope for live pads', () => {
         parseLivePadSharePayload(envelope.plaintext).href,
         'https://docs.example/pad/#/2/pad/edit/example/'
     );
+    assert.equal(
+        parsePrivateShareEnvelope(envelope).payload.href,
+        'https://docs.example/pad/#/2/pad/edit/example/'
+    );
+    assert.equal(
+        serializePrivateShareEnvelope(envelope),
+        '{"contentType":"application/vnd.postfiat.cryptpad-live-pad+json;version=1","createdAt":"2026-04-30T00:01:00.000Z","envelopeContentType":"application/vnd.postfiat.cryptpad-private-share-envelope+json;version=1","envelopeVersion":1,"plaintext":"{\\"createdAt\\":\\"2026-04-30T00:00:00.000Z\\",\\"href\\":\\"https://docs.example/pad/#/2/pad/edit/example/\\",\\"kind\\":\\"cryptpad-live-pad\\",\\"mode\\":\\"edit\\",\\"title\\":\\"Untitled document\\",\\"version\\":1}","transport":"nostr"}'
+    );
 });
 
 test('keeps a durable PFTL envelope for explicit publish/export flows', () => {
@@ -102,6 +112,14 @@ test('rejects malformed live pad share payloads', () => {
     }, {
         transport: 'ipfs',
     }), /INVALID_PRIVATE_SHARE_TRANSPORT/);
+    assert.throws(() => parsePrivateShareEnvelope({
+        envelopeVersion: 1,
+        envelopeContentType: PRIVATE_SHARE_ENVELOPE_CONTENT_TYPE,
+        transport: 'nostr',
+        contentType: 'application/json',
+        plaintext: '{}',
+        createdAt: '2026-04-30T00:00:00.000Z',
+    }), /UNSUPPORTED_PRIVATE_SHARE_CONTENT_TYPE/);
     assert.throws(() => parseLivePadSharePayload({
         kind: 'other',
         version: 1,

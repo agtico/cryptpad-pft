@@ -159,7 +159,7 @@ Task Node wallet behavior:
 - X25519 context keys can be deterministically derived from the mnemonic;
 - `ensureMessageKeyPublished` publishes the wallet's X25519 public key to XRPL `AccountSet.MessageKey` with prefix `ED`.
 
-For this fork, Task Node style mnemonic login should be the primary in-browser wallet path. MetaMask Snap login can remain optional for users who already use that workflow.
+For this fork, Task Node style mnemonic login should be the primary in-browser wallet path. MetaMask/PFTL Snap support is not required for MVP and should be treated as a later external wallet adapter if demand appears.
 
 ## Existing Task Node Wallet Standalone Repo
 
@@ -176,7 +176,7 @@ This repo currently uses XRPL family seeds, not the newer 24-word BIP39 flow. Tr
 1. Use CryptPad's login machinery, but replace password-derived entropy with wallet-signature-derived entropy.
 2. Use the wallet classic address as the user identity.
 3. Prefer Task Node's 24-word BIP39 wallet as the native login path.
-4. Keep MetaMask PFTL Snap as an optional login path.
-5. Use PFTL v3 manifests and XRPL pointer memos as the canonical share system.
-6. Bridge live CryptPad pads by encrypting their secret URLs through PFTL first; do not expose raw CryptPad links as the PFT-native UX.
+4. Use encrypted Nostr relay delivery as the canonical private share/chat transport.
+5. Keep PFTL v3 manifests and XRPL pointer memos for explicit durable publication/export, not normal private sharing.
+6. Bridge live CryptPad pads by encrypting their capability URLs into private Nostr gift wraps; keep raw CryptPad links as an advanced/legacy UX.
 7. Treat revocation honestly: removing a key shard does not revoke a file key that a recipient has already seen. Strong revocation requires rotating content and file keys.

@@ -137,6 +137,42 @@ export const buildPrivateShareEnvelope = (payload, options = {}) => ({
     createdAt: normalizeCreatedAt(options.createdAt),
 });
 
+export const parsePrivateShareEnvelope = (serialized) => {
+    const parsed = typeof serialized === 'string' ? JSON.parse(serialized) : serialized;
+    if (!parsed || typeof parsed !== 'object') {
+        throw new Error('INVALID_PRIVATE_SHARE_ENVELOPE');
+    }
+    if (parsed.envelopeVersion !== PRIVATE_SHARE_ENVELOPE_VERSION ||
+        parsed.envelopeContentType !== PRIVATE_SHARE_ENVELOPE_CONTENT_TYPE) {
+        throw new Error('UNSUPPORTED_PRIVATE_SHARE_ENVELOPE');
+    }
+    const envelope = {
+        envelopeVersion: PRIVATE_SHARE_ENVELOPE_VERSION,
+        envelopeContentType: PRIVATE_SHARE_ENVELOPE_CONTENT_TYPE,
+        transport: normalizeTransport(parsed.transport),
+        contentType: parsed.contentType,
+        plaintext: String(parsed.plaintext || ''),
+        createdAt: normalizeCreatedAt(parsed.createdAt),
+    };
+    if (envelope.contentType !== LIVE_PAD_SHARE_CONTENT_TYPE) {
+        throw new Error('UNSUPPORTED_PRIVATE_SHARE_CONTENT_TYPE');
+    }
+    envelope.payload = parseLivePadSharePayload(envelope.plaintext);
+    return envelope;
+};
+
+export const serializePrivateShareEnvelope = (envelope) => {
+    const parsed = parsePrivateShareEnvelope(envelope);
+    return stableStringify({
+        envelopeVersion: parsed.envelopeVersion,
+        envelopeContentType: parsed.envelopeContentType,
+        transport: parsed.transport,
+        contentType: parsed.contentType,
+        plaintext: parsed.plaintext,
+        createdAt: parsed.createdAt,
+    });
+};
+
 export const buildPftlContentEnvelope = (payload) => ({
     envelopeVersion: PFTL_CONTENT_ENVELOPE_VERSION,
     transport: 'pftl',

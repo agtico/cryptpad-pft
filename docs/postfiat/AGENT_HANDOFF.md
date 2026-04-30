@@ -31,7 +31,9 @@ Implemented so far:
 - `src/postfiat/key-registry.mjs`: recipient X25519 key parsing with Task Node `MessageKey` preferred over legacy Domain `x25519:`, plus an AccountSet transaction shape helper for MessageKey publication.
 - `src/postfiat/nostr-identity.mjs`: PFT wallet-signature-derived Nostr keypair and wallet -> Nostr pubkey -> relay directory record helpers.
 - `src/postfiat/live-pad-share.mjs`: canonical plaintext envelope for packaging live CryptPad pad capabilities before encrypted Nostr delivery, plus explicit durable PFTL envelope plumbing.
-- `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, wallet session storage, key registry parsing, Nostr identity/directory records, and live-pad share payloads.
+- `src/postfiat/nostr-private-share.mjs`: NIP-44 v2 encryption/decryption, NIP-01 event signing/verification, and NIP-59-style seal/gift-wrap helpers for private live-pad shares.
+- `src/postfiat/nostr-relay-client.mjs`: relay WebSocket helpers for publishing gift wraps and fetching recipient inbox gift wraps.
+- `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, wallet session storage, key registry parsing, Nostr identity/directory records, NIP-44/NIP-59 wrapping, relay publish/fetch helpers, and live-pad share payloads.
 
 Architecture pivot to preserve privacy:
 
@@ -58,8 +60,8 @@ Use these local repos as references:
 ## Recommended Implementation Order
 
 1. Add browser e2e coverage for wallet-first login, seed login, saved-wallet unlock, session lock, and drive recovery.
-2. Implement NIP-44 encryption and NIP-59/NIP-17-style wrapping around the canonical live-pad payload.
-3. Wire `src/postfiat/live-pad-share.mjs` into a real share-to-wallet modal and deliver it over encrypted Nostr events.
+2. Wire `src/postfiat/live-pad-share.mjs` and `src/postfiat/nostr-private-share.mjs` into a real share-to-wallet modal.
+3. Connect `src/postfiat/nostr-relay-client.mjs` to configured PFT/user relays in the browser.
 4. Build the private "Shared with me" Nostr inbox before any on-chain/IPFS pointer inbox.
 5. Keep PFTL/IPFS durable publishing behind explicit UX and privacy warnings.
 
@@ -68,7 +70,7 @@ Use these local repos as references:
 - Primary login identity is the XRPL classic wallet address.
 - Primary wallet UX is Task Node 24-word seed phrase.
 - Username/password login is legacy compatibility. Keep it hidden by default, and only hard-disable it with `postFiat.disableLegacyLogin` after account migration is solved.
-- MetaMask Snap support is optional, not the only path.
+- MetaMask/PFTL Snap support is de-scoped from MVP. Treat external wallet providers as later adapters after Task Node seed login and Nostr private sharing are solid.
 - Canonical private share model is encrypted Nostr relay delivery of live-pad capability payloads.
 - Durable/publication share model is PFTL v3 ContentBlob/AccessManifest plus XRPL pointer memo, used only when the user explicitly chooses durable publication/export.
 - Raw CryptPad URL sharing should be legacy/advanced, not the main PFT UX.

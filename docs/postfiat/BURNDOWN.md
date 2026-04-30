@@ -27,7 +27,7 @@ Status values:
 - [x] Keep wallet-derived CryptPad login capabilities in session storage only.
 - [x] Use encrypted session-only unlocked mnemonic handling patterned after `pftasks/app/src/lib/wallet/session.js`.
 - [x] Add wallet signing helper for canonical Post Fiat login/access messages.
-- [ ] Add MetaMask PFTL Snap support as an optional wallet provider.
+- [ ] Consider optional external wallet providers after the Task Node seed path and Nostr sharing are complete.
 - [x] Add tests for mnemonic normalization, derivation path, address derivation, and signature verification.
 
 ## Phase 2: Wallet Login Into CryptPad
@@ -64,7 +64,7 @@ Status values:
 - [x] Define a PFT wallet directory record: wallet address -> Nostr public key -> preferred relay set.
 - [x] Add Nostr relay config, including PFT-operated default relays and user/private relay overrides.
 - [x] Package pad capability secrets as a canonical live-pad share payload.
-- [ ] Encrypt live-pad share payloads with NIP-44 and wrap/deliver them with NIP-59/NIP-17 style private events.
+- [~] Encrypt live-pad share payloads with NIP-44 and wrap/deliver them with NIP-59/NIP-17 style private events.
 - [ ] Add "Share to wallet" as the primary share action in the CryptPad share modal.
 - [ ] Add "Shared with me" inbox based on encrypted Nostr relay messages, not on-chain pointer scans.
 - [ ] Let recipient import/open a received live pad from the private inbox.
@@ -134,7 +134,7 @@ Status values:
 ## Immediate Next Tasks
 
 1. Add browser e2e tests for wallet-first login, saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
-2. Implement NIP-44 encryption and NIP-59/NIP-17-style wrapping for `src/postfiat/live-pad-share.mjs` payloads.
-3. Wire the private share payload into a real share-to-wallet modal and deliver it over encrypted Nostr events.
-4. Add a private "Shared with me" Nostr inbox before adding any on-chain/IPFS pointer inbox.
+2. Wire the tested NIP-44/NIP-59 private share payload into a real share-to-wallet modal.
+3. Add a private "Shared with me" Nostr inbox before adding any on-chain/IPFS pointer inbox.
+4. Connect the relay client to configured PFT/user relays and add browser-level integration tests.
 5. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.

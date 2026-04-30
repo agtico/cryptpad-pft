@@ -26,10 +26,11 @@ Canonical user id:
 XRPL classic address, e.g. r...
 ```
 
-Supported login methods:
+Supported MVP login method:
 
-1. Task Node 24-word seed phrase wallet.
-2. Existing MetaMask PFTL Snap wallet.
+- Task Node 24-word seed phrase wallet.
+
+Optional external wallet providers can be considered later, but they are not required for the core PFT-native product.
 
 Task Node native login should use the same BIP39 and derivation path as `pftasks`:
 
@@ -43,7 +44,7 @@ The browser wallet should never require a server-side seed unlock. A server nonc
 
 Use one canonical wallet-auth signature to derive CryptPad account entropy:
 
-1. derive/sign the XRPL wallet from the 24-word mnemonic, or ask the Snap to sign;
+1. derive/sign the XRPL wallet from the 24-word mnemonic;
 2. sign the canonical Post Fiat login message;
 3. hash-chain the signature into 192 bytes;
 4. allocate those bytes into CryptPad drive/login key material;
@@ -104,6 +105,8 @@ Current implementation checkpoint:
 
 - `src/postfiat/nostr-identity.mjs` derives a Nostr secp256k1 keypair from a domain-separated PFT wallet signature and defines wallet -> Nostr pubkey -> relay directory records.
 - `src/postfiat/live-pad-share.mjs` builds canonical live-pad payloads and marks Nostr as the normal private-share envelope transport.
+- `src/postfiat/nostr-private-share.mjs` implements NIP-44 v2 payload encryption, NIP-01 event signing/verification, and NIP-59-style seal/gift-wrap helpers for live-pad share envelopes.
+- `src/postfiat/nostr-relay-client.mjs` publishes signed gift wraps and fetches recipient inbox gift wraps over Nostr relay WebSockets.
 - `/api/config` exposes `postFiat.nostr.relays`, `postFiat.nostr.privateRelays`, and `postFiat.nostr.relayProxy` for instance-level relay policy.
 - PFTL envelopes remain available only as explicit durable publish/export plumbing.
 
