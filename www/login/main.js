@@ -26,8 +26,8 @@ define([
         const forceWalletVault = window.location.hash === "#wallet-vault";
         const alreadyLoggedIn = LocalStore.isLoggedIn();
         if (alreadyLoggedIn && !forceWalletVault) {
-            // already logged in, redirect to drive
-            document.location.href = '/drive/';
+            // already logged in, redirect to the Post Fiat workspace
+            document.location.href = '/app/';
             return;
         }
 
@@ -171,17 +171,33 @@ define([
                 $savePassword.val('');
             }
         };
+        var startWalletSession = function (Core, mnemonic) {
+            if (!Core.createSessionWallet) { return Promise.resolve(); }
+            return Promise.resolve(Core.createSessionWallet(mnemonic)).then(function () {
+                if (Core.startSessionWalletResponder) {
+                    Core.startSessionWalletResponder();
+                }
+            });
+        };
+        var redirectAfterWalletLogin = function (Core, mnemonic) {
+            return function () {
+                startWalletSession(Core, mnemonic).then(function () {
+                    LocalStore.clearLoginToken();
+                    Login.redirect();
+                }).catch(function (err) {
+                    console.error(err);
+                    UI.removeLoadingScreen(function () {
+                        UI.warn('Unable to unlock the Post Fiat wallet for this session.');
+                    });
+                });
+                return true;
+            };
+        };
         var loginWithMnemonic = async function (Core, mnemonic, shouldImport) {
             var wallet = Core.deriveWalletFromMnemonic(mnemonic);
             var message = WalletAuth.getLoginMessage(wallet.address);
             var signed = Core.signMessage(mnemonic, message);
 
-            if (Core.createSessionWallet) {
-                await Core.createSessionWallet(wallet.mnemonic);
-                if (Core.startSessionWalletResponder) {
-                    Core.startSessionWalletResponder();
-                }
-            }
             Login.loginOrRegisterUI({
                 uname: wallet.address,
                 passwd: '',
@@ -192,7 +208,8 @@ define([
                     signature: signed.signature,
                     message: message,
                 },
-                onOTP: UI.getOTPScreen
+                onOTP: UI.getOTPScreen,
+                cb: redirectAfterWalletLogin(Core, wallet.mnemonic)
             });
         };
         var saveMnemonicIfRequested = async function (Core, mnemonic) {
@@ -205,7 +222,7 @@ define([
             refreshSavedWallet();
         };
         var redirectAfterVaultSetup = function () {
-            document.location.href = '/drive/';
+            document.location.href = '/app/';
         };
         var saveWalletVaultOnly = async function (Core, mnemonic) {
             var wallet = Core.deriveWalletFromMnemonic(mnemonic);
@@ -220,12 +237,7 @@ define([
             }
 
             await Core.saveWallet(savePassword, wallet.mnemonic);
-            if (Core.createSessionWallet) {
-                await Core.createSessionWallet(wallet.mnemonic);
-                if (Core.startSessionWalletResponder) {
-                    Core.startSessionWalletResponder();
-                }
-            }
+            await startWalletSession(Core, wallet.mnemonic);
             refreshSavedWallet();
             UI.log('Post Fiat wallet saved on this browser.');
             redirectAfterVaultSetup();
@@ -311,12 +323,7 @@ define([
                 }
                 var saved = await Core.unlockSavedWallet(password);
                 if (forceWalletVault && alreadyLoggedIn) {
-                    if (Core.createSessionWallet) {
-                        await Core.createSessionWallet(saved.mnemonic);
-                        if (Core.startSessionWalletResponder) {
-                            Core.startSessionWalletResponder();
-                        }
-                    }
+                    await startWalletSession(Core, saved.mnemonic);
                     UI.log('Post Fiat wallet unlocked.');
                     redirectAfterVaultSetup();
                     return;

@@ -46,6 +46,83 @@
     .cp-default-label {
         display: none;
     }
+    .pft-login-page {
+        background: #f5f7f8;
+        .cp-container {
+            max-width: 1120px;
+        }
+        .cp-page-title {
+            h1 {
+                margin-bottom: 4px;
+                color: #15201b;
+                font-size: 34px;
+                font-weight: 800;
+                letter-spacing: 0;
+            }
+        }
+        .pft-login-subtitle {
+            p {
+                width: 100%;
+                margin: 0 0 18px;
+                color: #5e6b64;
+                text-align: center;
+            }
+        }
+        #userForm {
+            border: 1px solid #dbe3e4;
+            border-radius: 8px;
+            box-shadow: 0 18px 48px rgba(20, 31, 28, 0.12);
+            padding: 18px;
+        }
+        .cp-postfiat-wallet-login {
+            .cp-login-instance {
+                margin-bottom: 14px;
+                color: #17201c;
+                font-size: 18px;
+                font-weight: 800;
+            }
+            .big-container {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .input-container {
+                display: block;
+            }
+            .cp-default-label {
+                display: block;
+                margin-bottom: 6px;
+                color: #415049;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            textarea.form-control,
+            input.form-control,
+            #pft-saved-wallet-address,
+            #pft-generated-wallet-address {
+                width: 100%;
+                max-width: none;
+                border: 1px solid #ccd7da;
+                border-radius: 8px;
+                background: #fff;
+                box-shadow: none;
+            }
+            .extra {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .btn {
+                border-radius: 8px;
+                font-weight: 700;
+            }
+            .btn-primary {
+                border-color: #1c6f5a;
+                background: #1c6f5a;
+            }
+        }
+    }
     .extra {
         margin-top: 1em;
         button.login {
@@ -53,4 +130,3 @@
         }
     }
 }
-

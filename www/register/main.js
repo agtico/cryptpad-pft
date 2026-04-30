@@ -23,8 +23,8 @@ define([
     var Messages = Cryptpad.Messages;
     $(function () {
         if (LocalStore.isLoggedIn()) {
-            // already logged in, redirect to drive
-            document.location.href = '/drive/';
+            // already logged in, redirect to the Post Fiat workspace
+            document.location.href = '/app/';
             return;
         }
 

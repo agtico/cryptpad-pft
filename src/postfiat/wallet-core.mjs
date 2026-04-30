@@ -69,9 +69,48 @@ const transactionRequest = async (mode, handler) => {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(SESSION_WALLET_STORE, mode);
         const store = tx.objectStore(SESSION_WALLET_STORE);
-        const request = handler(store);
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => reject(request.error);
+        let result = null;
+        let settled = false;
+        const settle = (fn) => {
+            if (settled) { return; }
+            settled = true;
+            try {
+                db.close();
+            } catch (err) {
+                console.error(err);
+            }
+            fn();
+        };
+
+        tx.oncomplete = () => settle(() => resolve(result));
+        tx.onerror = () => settle(() => reject(tx.error ||
+            new Error('INDEXEDDB_TRANSACTION_ERROR')));
+        tx.onabort = () => settle(() => reject(tx.error ||
+            new Error('INDEXEDDB_TRANSACTION_ABORTED')));
+
+        let request;
+        try {
+            request = handler(store);
+        } catch (err) {
+            try {
+                tx.abort();
+            } catch (abortErr) {
+                console.error(abortErr);
+            }
+            settle(() => reject(err));
+            return;
+        }
+
+        request.onsuccess = () => {
+            result = typeof(request.result) === 'undefined' ? null : request.result;
+        };
+        request.onerror = () => {
+            try {
+                tx.abort();
+            } catch (err) {
+                console.error(err);
+            }
+        };
     });
 };
 
@@ -379,7 +418,6 @@ export const restoreSessionWallet = async (options = {}) => {
     const keyStore = getSessionKeyStore(options.keyStore);
     const raw = storage.getItem(SESSION_WALLET_STORAGE_KEY);
     if (!raw) {
-        await keyStore.delete();
         return null;
     }
 

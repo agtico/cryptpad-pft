@@ -26,6 +26,7 @@ Status values:
 - [x] Store encrypted wallet payload with PBKDF2-SHA256/AES-GCM.
 - [x] Keep wallet-derived CryptPad login capabilities in session storage only.
 - [x] Use encrypted session-only unlocked mnemonic handling patterned after `pftasks/app/src/lib/wallet/session.js`.
+- [x] Preserve the unlocked wallet session across CryptPad's sandboxed SFrame handoff without exposing the seed to fake frame storage.
 - [x] Add wallet signing helper for canonical Post Fiat login/access messages.
 - [ ] Consider optional external wallet providers after the Task Node seed path and Nostr sharing are complete.
 - [x] Add tests for mnemonic normalization, derivation path, address derivation, and signature verification.
@@ -46,8 +47,9 @@ Status values:
 - [ ] Decide migration behavior for old username/password users.
 - [x] Add wallet-login UI for create/restore/unlock.
 - [x] Add saved-wallet unlock path that avoids repeated seed paste.
+- [x] Redirect only after the wallet session has been recreated after CryptPad login persistence.
 - [ ] Add server nonce session only where server authorization is needed.
-- [ ] Add e2e test: restore same 24-word seed in a new browser and recover same CryptPad drive.
+- [~] Add e2e test: restore same 24-word seed in a new browser and recover same CryptPad drive.
 
 ## Phase 3: PFTL Key Registry
 
@@ -95,27 +97,27 @@ Status values:
 ## Phase 6: UI Redesign
 
 - [x] Define the Post Fiat native UX target and implementation burndown in `docs/postfiat/UX_SPEC.md`.
-- [ ] Add `/app/` as the wallet workspace home.
-- [ ] Redirect successful wallet login to `/app/`, not `/drive/`.
-- [ ] Keep `/drive/` accessible as a legacy/advanced escape hatch during migration.
-- [ ] Build a Post Fiat shell with top bar, wallet badge, lock state, search, new document action, desktop left rail, and mobile bottom nav.
-- [~] Replace stock landing/login surfaces with wallet-first flows.
-- [ ] Replace the stock CryptPad drive with a modern document workspace backed by CryptPad drive data.
-- [ ] Add document filters for owned, shared, recent, and archived docs.
+- [x] Add `/app/` as the wallet workspace home.
+- [x] Redirect successful wallet login to `/app/`, not `/drive/`.
+- [x] Keep `/drive/` accessible as a legacy/advanced escape hatch during migration.
+- [x] Build a Post Fiat shell with top bar, wallet badge, lock state, search, new document action, desktop left rail, and mobile bottom nav.
+- [x] Replace stock landing/login surfaces with wallet-first flows.
+- [~] Replace the stock CryptPad drive with a modern document workspace backed by CryptPad drive data.
+- [~] Add document filters for owned, shared, recent, and archived docs.
 - [ ] Open live CryptPad pads inside a Post Fiat editor shell.
 - [ ] Move share/account controls out of CryptPad editor modals where feasible.
 - [ ] Add editor side panels for Share, Chat, Info, and History.
-- [ ] Replace Access rights/Post Fiat tab with a dedicated `Share to wallet` sheet.
-- [ ] Hide raw Nostr pubkey and inbox JSON inputs behind advanced controls.
+- [~] Replace Access rights/Post Fiat tab with a dedicated `Share to wallet` sheet.
+- [~] Hide raw Nostr pubkey and inbox JSON inputs behind advanced controls.
 - [ ] Keep raw CryptPad link copy available as an advanced/legacy action.
-- [ ] Add wallet account panel, relay/network state, key publication state, and local vault state.
+- [~] Add wallet account panel, relay/network state, key publication state, and local vault state.
 - [~] Add wallet contacts/address book.
 - [~] Add PFT-native share modal.
-- [ ] Build `/app/shared/` as a first-class encrypted inbox.
-- [ ] Build `/app/sent/` for sent share history and relay delivery status.
-- [ ] Build `/app/contacts/` for wallet contacts, inbox directory refresh, and first-contact recovery.
-- [ ] Build `/app/durable/` as an explicit PFTL/IPFS publication workspace with privacy review.
-- [ ] Review mobile layout for workspace, editor, wallet unlock, share, inbox, and contacts flows.
+- [~] Build `/app/shared/` as a first-class encrypted inbox.
+- [~] Build `/app/sent/` for sent share history and relay delivery status.
+- [~] Build `/app/contacts/` for wallet contacts, inbox directory refresh, and first-contact recovery.
+- [~] Build `/app/durable/` as an explicit PFTL/IPFS publication workspace with privacy review.
+- [~] Review mobile layout for workspace, editor, wallet unlock, share, inbox, and contacts flows.
 - [ ] Remove fragile repeated CSS timeout injection from previous prototypes.
 - [ ] Add screenshot regression checks for desktop and mobile.
 
@@ -153,8 +155,9 @@ Status values:
 
 ## Immediate Next Tasks
 
-1. Add browser e2e tests for wallet-first login, saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
-2. Add browser-level integration tests against a local or fake Nostr relay for share publish, inbox refresh, open, and save.
-3. Add browser e2e coverage for wallet-directory publish/fetch and share-by-wallet-address.
-4. Improve the first-pass Post Fiat share/inbox UI styling and mobile layout.
-5. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.
+1. Convert the manual hosted wallet-first login check into a committed browser e2e test, including the SFrame wallet-session handoff.
+2. Add saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery browser coverage.
+3. Add browser-level integration tests against a local or fake Nostr relay for share publish, inbox refresh, open, and save.
+4. Add browser e2e coverage for wallet-directory publish/fetch and share-by-wallet-address.
+5. Improve the first-pass Post Fiat share/inbox UI styling and mobile layout.
+6. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.

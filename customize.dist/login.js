@@ -39,7 +39,7 @@ define([
 
     var Nacl = window.nacl;
 
-    var redirectTo = '/drive/';
+    var redirectTo = ApiConfig && ApiConfig.postFiat ? '/app/' : '/drive/';
     var setRedirectTo = function () {
         var parsed = Hash.parsePadUrl(window.location.href);
         if (parsed.hashData && parsed.hashData.newPadOpts) {
@@ -81,6 +81,10 @@ define([
             if (Exports.mergeAnonDrive) {
                 loginOpts.mergeAnonDrive = 1;
             }
+            if (ApiConfig && ApiConfig.postFiat && h === '/app/' && !Exports.mergeAnonDrive) {
+                window.location.href = h;
+                return;
+            }
             h = Hash.getLoginURL(h, loginOpts);
 
             var parser = document.createElement('a');
@@ -90,7 +94,7 @@ define([
                 return;
             }
         }
-        window.location.href = '/drive/';
+        window.location.href = ApiConfig && ApiConfig.postFiat ? '/app/' : '/drive/';
     };
 
     var hashing;

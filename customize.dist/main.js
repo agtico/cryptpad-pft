@@ -5,7 +5,8 @@
 define([
     'jquery',
     '/common/outer/local-store.js',
-], function ($, LocalStore) {
+    '/api/config',
+], function ($, LocalStore, ApiConfig) {
 
     $(function () {
         var $main = $('#mainBlock');
@@ -18,7 +19,7 @@ define([
 
         if (LocalStore.isLoggedIn() && LocalStore.getDriveRedirectPreference()) {
             if (window.location.pathname === '/') {
-                window.location = '/drive/';
+                window.location = ApiConfig && ApiConfig.postFiat ? '/app/' : '/drive/';
                 return;
             }
         }

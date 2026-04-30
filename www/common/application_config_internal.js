@@ -16,7 +16,7 @@ const factory = () => {
      * redirected to the drive.
      * You should never remove the drive from this list.
      */
-    AppConfig.availablePadTypes = ['drive', 'teams', 'sheet', 'doc', 'presentation', 'pad', 'kanban', 'code', 'form', 'poll', 'whiteboard',
+    AppConfig.availablePadTypes = ['app', 'drive', 'teams', 'sheet', 'doc', 'presentation', 'pad', 'kanban', 'code', 'form', 'poll', 'whiteboard',
                                 'file', 'contacts', 'slide', 'convert', 'diagram'];
 
     /* The registered only types are apps restricted to registered users.
@@ -37,7 +37,7 @@ const factory = () => {
 
     // to prevent apps that aren't officially supported from showing up
     // in the document creation modal
-    AppConfig.hiddenTypes = ['drive', 'teams', 'contacts', 'todo', 'file', 'accounts', 'calendar', 'poll', 'convert',
+    AppConfig.hiddenTypes = ['app', 'drive', 'teams', 'contacts', 'todo', 'file', 'accounts', 'calendar', 'poll', 'convert',
     //'doc', 'presentation'
     ];
 

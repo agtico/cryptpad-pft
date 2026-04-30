@@ -198,6 +198,25 @@ test('stores an unlocked wallet in session-scoped encrypted storage', async () =
     assert.equal(await restoreSessionWallet({ storage, keyStore }), null);
 });
 
+test('missing session records do not delete the shared session wallet key', async () => {
+    const storage = makeStorage();
+    const keyStore = makeKeyStore();
+
+    await createSessionWallet(TEST_MNEMONIC, {
+        storage,
+        keyStore,
+        createdAt: '2026-04-30T00:00:00.000Z',
+    });
+    const sessionRecord = storage.getItem(SESSION_WALLET_STORAGE_KEY);
+
+    storage.removeItem(SESSION_WALLET_STORAGE_KEY);
+    assert.equal(await restoreSessionWallet({ storage, keyStore }), null);
+
+    storage.setItem(SESSION_WALLET_STORAGE_KEY, sessionRecord);
+    const restored = await restoreSessionWallet({ storage, keyStore });
+    assert.equal(restored.wallet.address, TEST_ADDRESS);
+});
+
 test('imports an unlocked wallet session from another browser context', async () => {
     const sourceStorage = makeStorage();
     const sourceKeyStore = makeKeyStore();

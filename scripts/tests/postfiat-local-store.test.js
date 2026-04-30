@@ -104,6 +104,16 @@ test('wallet logins store the login capability in session storage only', () => {
     assert.equal(sessionStorage[Constants.blockHashKey], 'wallet-block');
 });
 
+test('wallet login persistence preserves an unlocked session wallet', () => {
+    const { LocalStore, sessionStorage } = loadLocalStore();
+
+    sessionStorage.PFT_session_wallet = '{"version":1}';
+    LocalStore.walletLogin(undefined, 'wallet-block', 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+
+    assert.equal(sessionStorage.PFT_session_wallet, '{"version":1}');
+    assert.equal(LocalStore.isWalletSession(), true);
+});
+
 test('wallet sessions can be exported and imported into a new tab', () => {
     const address = 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC';
     const source = loadLocalStore();

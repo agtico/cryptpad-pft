@@ -47,20 +47,28 @@ define([
             delete localStorage[k];
         });
     };
-    var removeWalletSession = function () {
-        [
-            pftWalletSessionKey,
-            pftSessionWalletStorageKey,
-            Constants.userNameKey,
-            Constants.userHashKey,
-            Constants.blockHashKey,
-            Constants.sessionJWT,
-            Constants.ssoSeed,
-            Constants.tokenKey,
-        ].forEach(function (k) {
+    var walletLoginSessionKeys = [
+        pftWalletSessionKey,
+        Constants.userNameKey,
+        Constants.userHashKey,
+        Constants.blockHashKey,
+        Constants.sessionJWT,
+        Constants.ssoSeed,
+        Constants.tokenKey,
+    ];
+    var removeWalletSessionKeys = function (keys) {
+        keys.forEach(function (k) {
             sessionStorage.removeItem(k);
             delete sessionStorage[k];
         });
+    };
+    var removeWalletLoginSession = function () {
+        removeWalletSessionKeys(walletLoginSessionKeys);
+    };
+    var removeWalletSession = function () {
+        removeWalletSessionKeys([
+            pftSessionWalletStorageKey,
+        ].concat(walletLoginSessionKeys));
     };
     var isWalletAddress = function (name) {
         return typeof(name) === 'string' && pftWalletAddressPattern.test(name);
@@ -111,7 +119,7 @@ define([
         if (typeof(payload.blockHash) !== 'string' || !payload.blockHash) { return false; }
 
         removeLocalLogin();
-        removeWalletSession();
+        removeWalletLoginSession();
         safeSessionSet(pftWalletSessionKey, '1');
         safeSessionSet(Constants.userNameKey, payload.userName);
         safeSessionSet(Constants.blockHashKey, payload.blockHash);
@@ -352,7 +360,7 @@ define([
         if (!userHash && !blockHash) { throw new Error('expected a user hash'); }
         if (!name) { throw new Error('expected a user name'); }
         removeLocalLogin();
-        removeWalletSession();
+        removeWalletLoginSession();
         safeSessionSet(pftWalletSessionKey, '1');
         if (userHash) { safeSessionSet(Constants.userHashKey, Hash.serializeHash(userHash)); }
         if (blockHash) { safeSessionSet(Constants.blockHashKey, blockHash); }

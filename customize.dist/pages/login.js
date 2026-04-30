@@ -31,11 +31,33 @@ define([
             // skip login page
             return;
         }
-        return [h('div#cp-main', [
+        var pftLoginCss = [
+            '#cp-main.pft-login-page{min-height:100vh;background:#f5f7f8;color:#17201c;}',
+            '#cp-main.pft-login-page .navbar,#cp-main.pft-login-page .cp-topbar,#cp-main.pft-login-page footer,#cp-main.pft-login-page .cp-footer{display:none!important;}',
+            '#cp-main.pft-login-page .cp-container{max-width:760px;min-height:100vh;display:grid;align-content:center;padding:32px 16px;}',
+            '#cp-main.pft-login-page .cp-page-title h1{margin:0;color:#17201c;font-family:Arial,sans-serif;font-size:36px;font-weight:800;letter-spacing:0;text-align:center;}',
+            '#cp-main.pft-login-page .pft-login-subtitle p{width:100%;margin:8px 0 18px;color:#5e6b64;text-align:center;}',
+            '#cp-main.pft-login-page #userForm{float:none;max-width:620px;margin:0 auto;padding:20px;border:1px solid #dbe3e4;border-radius:8px;background:#fff;box-shadow:0 18px 48px rgba(20,31,28,.12);}',
+            '#cp-main.pft-login-page .cp-postfiat-wallet-login .cp-login-instance{margin-bottom:14px;color:#17201c;font-size:18px;font-weight:800;}',
+            '#cp-main.pft-login-page .cp-postfiat-wallet-login .big-container{display:grid!important;grid-template-columns:1fr!important;gap:10px;}',
+            '#cp-main.pft-login-page .cp-postfiat-wallet-login .input-container{display:block!important;}',
+            '#cp-main.pft-login-page .cp-postfiat-wallet-login .cp-default-label{display:block!important;margin-bottom:6px;color:#415049;font-size:12px;font-weight:700;}',
+            '#cp-main.pft-login-page .cp-postfiat-wallet-login textarea.form-control,#cp-main.pft-login-page .cp-postfiat-wallet-login input.form-control,#cp-main.pft-login-page #pft-saved-wallet-address,#cp-main.pft-login-page #pft-generated-wallet-address{border:1px solid #ccd7da;border-radius:8px;background:#fff;box-shadow:none;}',
+            '#cp-main.pft-login-page .cp-postfiat-wallet-login textarea.form-control,#cp-main.pft-login-page .cp-postfiat-wallet-login input.form-control{width:100%!important;max-width:none!important;}',
+            '#cp-main.pft-login-page .cp-postfiat-wallet-login .extra{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px;}',
+            '#cp-main.pft-login-page .btn{border-radius:8px;font-weight:700;text-transform:none;}',
+            '#cp-main.pft-login-page .btn-primary{border-color:#1c6f5a;background:#1c6f5a;}',
+            '#cp-main.pft-login-page .cp-login-encryption{display:none;}'
+        ].join('');
+        return [h('div#cp-main.pft-login-page', [
+            h('style', pftLoginCss),
             Pages.infopageTopbar(),
             h('div.container.cp-container', [
                 h('div.row.cp-page-title', h('h1', forceWalletVault ?
-                    'Post Fiat wallet vault' : Msg.login_login)),
+                    'Post Fiat wallet vault' : 'Post Fiat Docs')),
+                h('div.row.cp-page-title.pft-login-subtitle', h('p', forceWalletVault ?
+                    'Save or unlock the local encrypted wallet vault.' :
+                    'Open a private document workspace with your Post Fiat wallet.')),
                 h('div.row', [
                     h('div.col-md-3'+ssoEnforced),
                     h('div#userForm.form-group.col-md-6'+ssoEnforced, [
