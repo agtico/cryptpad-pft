@@ -113,8 +113,8 @@ Status values:
 - [ ] Add wallet nonce verification endpoint for server sessions.
 - [ ] Add PFTL pointer list endpoint with pagination.
 - [ ] Add manifest/blob fetch endpoints preserving signatures.
-- [ ] Add Docker compose example for standalone open-source instance.
-- [ ] Document AGPL source distribution obligations.
+- [x] Add Docker compose example for standalone open-source instance.
+- [x] Document AGPL source distribution obligations.
 
 ## Phase 8: Security Review
 

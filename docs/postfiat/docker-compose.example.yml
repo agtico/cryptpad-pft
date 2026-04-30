@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Post Fiat contributors
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+---
+services:
+  cryptpad-pft:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: agtico/cryptpad-pft:local
+    hostname: cryptpad-pft
+    restart: unless-stopped
+
+    environment:
+      - CPAD_MAIN_DOMAIN=https://docs.example.com
+      - CPAD_SANDBOX_DOMAIN=https://sandbox.docs.example.com
+      - CPAD_CONF=/cryptpad/config/config.js
+
+    volumes:
+      - ../../config/config.js:/cryptpad/config/config.js:ro
+      - ../../data/blob:/cryptpad/blob
+      - ../../data/block:/cryptpad/block
+      - ../../customize:/cryptpad/customize
+      - ../../data/data:/cryptpad/data
+      - ../../data/files:/cryptpad/datastore
+      - ../../onlyoffice-dist:/cryptpad/www/common/onlyoffice/dist
+      - ../../onlyoffice-conf:/cryptpad/onlyoffice-conf
+
+    ports:
+      - "3000:3000"
+      - "3003:3003"
+
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000

@@ -37,6 +37,7 @@ Read these first:
 - `docs/postfiat/ARCHITECTURE.md`
 - `docs/postfiat/BURNDOWN.md`
 - `docs/postfiat/AGENT_HANDOFF.md`
+- `docs/postfiat/DEPLOYMENT.md`
 
 ## Key Recommendation
 
