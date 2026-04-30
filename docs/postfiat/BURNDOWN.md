@@ -68,6 +68,7 @@ Status values:
 - [ ] Add "Share to wallet" as the primary share action in the CryptPad share modal.
 - [ ] Add "Shared with me" inbox based on encrypted Nostr relay messages, not on-chain pointer scans.
 - [ ] Let recipient import/open a received live pad from the private inbox.
+- [x] Add UI-ready workflow helpers that publish and open live-pad private shares from PFT wallet mnemonics.
 - [ ] Add peer chat/replies around shared documents using the same encrypted relay channel.
 - [ ] Keep raw CryptPad link copy available as an advanced/legacy action.
 - [ ] Add e2e test: wallet A creates pad, shares privately to wallet B via Nostr relay, wallet B opens it.
@@ -134,7 +135,7 @@ Status values:
 ## Immediate Next Tasks
 
 1. Add browser e2e tests for wallet-first login, saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
-2. Wire the tested NIP-44/NIP-59 private share payload into a real share-to-wallet modal.
+2. Bundle the tested private-share workflow for browser use and wire it into a real share-to-wallet modal.
 3. Add a private "Shared with me" Nostr inbox before adding any on-chain/IPFS pointer inbox.
-4. Connect the relay client to configured PFT/user relays and add browser-level integration tests.
+4. Add browser-level integration tests against a local or fake Nostr relay.
 5. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.

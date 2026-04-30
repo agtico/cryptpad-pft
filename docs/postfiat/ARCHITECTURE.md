@@ -107,6 +107,7 @@ Current implementation checkpoint:
 - `src/postfiat/live-pad-share.mjs` builds canonical live-pad payloads and marks Nostr as the normal private-share envelope transport.
 - `src/postfiat/nostr-private-share.mjs` implements NIP-44 v2 payload encryption, NIP-01 event signing/verification, and NIP-59-style seal/gift-wrap helpers for live-pad share envelopes.
 - `src/postfiat/nostr-relay-client.mjs` publishes signed gift wraps and fetches recipient inbox gift wraps over Nostr relay WebSockets.
+- `src/postfiat/private-share-workflow.mjs` ties PFT mnemonics, recipient directory records, relay selection, gift wrapping, relay publish/fetch, and recipient open/decrypt into one UI-ready workflow.
 - `/api/config` exposes `postFiat.nostr.relays`, `postFiat.nostr.privateRelays`, and `postFiat.nostr.relayProxy` for instance-level relay policy.
 - PFTL envelopes remain available only as explicit durable publish/export plumbing.
 
