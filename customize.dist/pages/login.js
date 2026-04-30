@@ -126,7 +126,7 @@ define([
                                 ]),
                             ]),
                             h('div.checkbox-container', [
-                                UI.createCheckbox('pft-save-wallet', 'Save encrypted wallet on this browser'),
+                                UI.createCheckbox('pft-save-wallet', 'Save encrypted wallet on this browser', true),
                             ]),
                             h('div.extra', [
                                 h('button#pft-wallet-login.btn.btn-primary', {

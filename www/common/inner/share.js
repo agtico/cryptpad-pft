@@ -440,28 +440,22 @@ define([
             h('div.cp-spacer'),
             unlockSavedButton
         ]);
-        var seedInput = h('textarea.form-control#cp-share-pft-seed', {
-            rows: 3,
-            spellcheck: false,
-            autocomplete: 'off',
-            placeholder: '24-word Post Fiat seed phrase'
-        });
-        var unlockSeedButton = h('button.btn.btn-secondary.cp-share-pft-unlock-seed', {
+        var openLoginButton = h('button.btn.btn-secondary.cp-share-pft-open-login', {
             type: 'button'
-        }, [Icons.get('key'), 'Unlock seed']);
-        var seedWalletUnlock = h('div.cp-share-pft-seed-wallet.cp-hidden', {
+        }, [Icons.get('login'), 'Open wallet login']);
+        var noSavedWallet = h('div.cp-share-pft-no-saved-wallet.cp-hidden', {
             style: 'display: none;'
         }, [
-            h('label.cp-default-label', { for: 'cp-share-pft-seed' }, '24-word seed phrase'),
-            seedInput,
+            h('div.cp-default-label', 'No saved wallet found'),
+            h('p', 'Save an encrypted Post Fiat wallet on this browser before sharing.'),
             h('div.cp-spacer'),
-            unlockSeedButton
+            openLoginButton
         ]);
         var walletStatus = h('div.cp-share-pft-wallet-status', { role: 'status' });
         var walletUnlock = h('div.alert.alert-warning.cp-share-pft-wallet-unlock', [
             h('div.cp-default-label', 'Wallet unlock'),
             savedWalletUnlock,
-            seedWalletUnlock,
+            noSavedWallet,
             walletStatus
         ]);
         var unlockedAddress = h('span.cp-share-pft-unlocked-address');
@@ -543,29 +537,35 @@ define([
             $(el).toggleClass('cp-hidden', !visible);
             $(el).css('display', visible ? '' : 'none');
         };
-        var showSeedUnlock = function () {
+        var showNoSavedWallet = function () {
             setVisible(savedWalletUnlock, false);
-            setVisible(seedWalletUnlock, true);
+            setVisible(noSavedWallet, true);
         };
         var showSavedUnlock = function () {
-            setVisible(seedWalletUnlock, false);
+            setVisible(noSavedWallet, false);
             setVisible(savedWalletUnlock, true);
         };
         var refreshSavedWalletUnlock = function () {
             try {
                 var Core = getPostFiatWalletCore();
-                if (typeof(Core.getSavedWalletMeta) !== 'function') { return; }
+                if (typeof(Core.getSavedWalletMeta) !== 'function') {
+                    showNoSavedWallet();
+                    setWalletStatus('Saved wallet storage is unavailable in this browser.', true);
+                    return;
+                }
                 var meta = Core.getSavedWalletMeta();
                 if (!meta || !meta.address) {
                     $(savedWalletAddress).text('');
-                    showSeedUnlock();
+                    showNoSavedWallet();
+                    setWalletStatus('Save an encrypted wallet from the login page before sharing.', true);
                     return;
                 }
                 $(savedWalletAddress).text(meta.address);
                 showSavedUnlock();
             } catch (err) {
                 console.error(err);
-                showSeedUnlock();
+                showNoSavedWallet();
+                setWalletStatus('Saved wallet storage is unavailable in this browser.', true);
             }
         };
         var setWalletUnlocked = function (address) {
@@ -656,7 +656,6 @@ define([
                     console.error(err);
                 });
             }
-            $(seedInput).val('');
             $(savedWalletPassword).val('');
             setWalletStatus('Wallet unlocked.');
             setWalletUnlocked(session.wallet.address);
@@ -698,15 +697,8 @@ define([
             e.preventDefault();
             $(unlockSavedButton).click();
         });
-        $(unlockSeedButton).on('click', function () {
-            var mnemonic = $(seedInput).val();
-            var attempt = walletUnlockAttempt += 1;
-            setWalletStatus('Unlocking seed phrase...');
-            unlockWithMnemonic(mnemonic).catch(function (err) {
-                if (attempt !== walletUnlockAttempt) { return; }
-                setWalletUnlockError(err, err && err.message === 'INVALID_MNEMONIC' ?
-                    'Invalid Post Fiat seed phrase.' : undefined);
-            });
+        $(openLoginButton).on('click', function () {
+            common.openURL('/login/');
         });
         $(switchWalletButton).on('click', function () {
             try {
