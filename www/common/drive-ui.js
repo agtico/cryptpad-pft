@@ -53,6 +53,8 @@ define([
     PadTypes,
     BrokenFormats,
     PostFiatContacts,
+    WalletCoreBundle,
+    PrivateShareBundle,
     Icons)
 {
 
