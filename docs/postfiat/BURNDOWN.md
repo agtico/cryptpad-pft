@@ -24,7 +24,8 @@ Status values:
 - [x] Use `@scure/bip39` and XRPL `Wallet.fromMnemonic` with path `m/44'/144'/0'/0/0`.
 - [~] Implement create wallet, restore wallet, unlock wallet, lock wallet.
 - [ ] Store encrypted wallet payload with PBKDF2-SHA256/AES-GCM or a reviewed stronger KDF.
-- [ ] Use session-only unlocked mnemonic handling patterned after `pftasks/app/src/lib/wallet/session.js`.
+- [x] Keep wallet-derived CryptPad login capabilities in session storage only.
+- [ ] Use encrypted session-only unlocked mnemonic handling patterned after `pftasks/app/src/lib/wallet/session.js`.
 - [x] Add wallet signing helper for canonical Post Fiat login/access messages.
 - [ ] Add MetaMask PFTL Snap support as an optional wallet provider.
 - [x] Add tests for mnemonic normalization, derivation path, address derivation, and signature verification.
@@ -37,6 +38,7 @@ Status values:
 - [x] Derive the 192-byte CryptPad login entropy from wallet signature.
 - [x] Use wallet address as the CryptPad username.
 - [x] Make wallet login idempotent: first use registers, later use logs in.
+- [x] Prevent stale persisted wallet `Block_hash` values from silently auto-unlocking.
 - [ ] Decide migration behavior for old username/password users.
 - [~] Add wallet-login UI for create/restore/unlock.
 - [ ] Add server nonce session only where server authorization is needed.
@@ -117,6 +119,7 @@ Status values:
 
 1. Add encrypted wallet-at-rest storage and session restore.
 2. Add wallet creation/onboarding with a save-confirm step.
-3. Run a browser e2e test proving the same 24-word seed recovers the same CryptPad drive.
-4. Start the visual redesign of login/drive around the Post Fiat shell.
+3. Run a browser e2e test proving a fresh browser must unlock before opening the wallet drive.
+4. Run a browser e2e test proving the same 24-word seed recovers the same CryptPad drive.
 5. Implement a minimal share-to-wallet bridge that encrypts a CryptPad URL secret as a PFTL v3 document.
+6. Start the visual redesign of login/drive around the Post Fiat shell.

@@ -21,7 +21,13 @@ Build a modern, open-source CryptPad distribution that:
 
 ## Current State
 
-This first commit is a clean upstream fork plus project handoff docs. No application behavior has been changed yet.
+The fork now includes the first Post Fiat wallet login path:
+
+- Task Node style 24-word BIP39/XRPL wallet derivation.
+- Canonical Post Fiat login message signing.
+- Deterministic CryptPad account derivation from the wallet signature.
+- Minimal wallet login UI.
+- Session-only wallet login capability storage so a wallet login does not leave a persistent CryptPad `Block_hash` in browser `localStorage`.
 
 Read these first:
 

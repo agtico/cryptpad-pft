@@ -126,6 +126,12 @@ define([
         var l = Object.keys(proxy).length;
         return l === 0 || (l === 2 && proxy._events && proxy.on);
     };
+    var persistLogin = function (opt, userHash, blockHash, name, cb) {
+        if (opt && opt.isWallet && LocalStore.walletLogin) {
+            return void LocalStore.walletLogin(userHash, blockHash, name, cb);
+        }
+        LocalStore.login(userHash, blockHash, name, cb);
+    };
 
     var legacyLogin = function (opt, isRegister, cb, res) {
         res = res || {};
@@ -165,7 +171,7 @@ define([
                 if (opt.isWallet) {
                     // Wallet login is intentionally idempotent: first use
                     // registers, later use opens the same derived drive.
-                    return void LocalStore.login(undefined, res.blockHash, res.uname, function () {
+                    return void persistLogin(opt, undefined, res.blockHash, res.uname, function () {
                         cb(void 0, res, rt);
                     });
                 }
@@ -204,7 +210,7 @@ define([
                 Realtime.whenRealtimeSyncs(rt.realtime, function () {
                     // the following stages are there to initialize a new drive
                     // if you are registering
-                    LocalStore.login(res.userHash, undefined, res.userName, function () {
+                    persistLogin(opt, res.userHash, undefined, res.userName, function () {
                         setTimeout(function () { cb(void 0, res); });
                     });
                 });
@@ -288,7 +294,7 @@ define([
             if (isRegister && !isProxyEmpty(rt.proxy)) {
                 if (opt.isWallet) {
                     Feedback.send('LOGIN', true);
-                    return void LocalStore.login(undefined, res.blockHash, res.uname, function () {
+                    return void persistLogin(opt, undefined, res.blockHash, res.uname, function () {
                         cb(void 0, res, RT);
                     });
                 }
@@ -301,7 +307,7 @@ define([
                 var LS_LANG = "CRYPTPAD_LANG";
                 if (l) { localStorage.setItem(LS_LANG, l); }
 
-                return void LocalStore.login(undefined, res.blockHash, res.uname, function () {
+                return void persistLogin(opt, undefined, res.blockHash, res.uname, function () {
                     cb(void 0, res, RT);
                 });
             }
@@ -617,7 +623,7 @@ define([
                 }
 
                 console.log("blockInfo available at:", res.blockHash);
-                LocalStore.login(undefined, res.blockHash, uname, function () {
+                persistLogin(res.opt, undefined, res.blockHash, uname, function () {
                     cb(void 0, res);
                 });
             }));

@@ -107,7 +107,7 @@
     "lint:translations": "node ./scripts/translations/lint-translations.js",
     "unused-translations": "node ./scripts/translations/unused-translations.js",
     "test": "node scripts/TestSelenium.js",
-    "test:postfiat": "node --test scripts/tests/postfiat-wallet-auth.test.js scripts/tests/postfiat-wallet-core.test.mjs",
+    "test:postfiat": "node --test scripts/tests/postfiat-wallet-auth.test.js scripts/tests/postfiat-wallet-core.test.mjs scripts/tests/postfiat-local-store.test.js",
     "test-rpc": "cd scripts/tests && node test-rpc",
     "build:postfiat": "rollup -c rollup.postfiat.config.mjs",
     "evict-inactive": "node scripts/evict-inactive.js",

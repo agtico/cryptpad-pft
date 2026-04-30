@@ -11,6 +11,8 @@ define([
     '/common/common-util.js',
 ], function (Constants, Hash, Cache, localForage, AppConfig, Util) {
     var LocalStore = {};
+    var pftWalletSessionKey = 'PFT_wallet_session';
+    var pftWalletAddressPattern = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/;
 
     var safeSet = function (key, val) {
         try {
@@ -18,6 +20,51 @@ define([
         } catch (err) {
             console.error(err);
         }
+    };
+    var safeSessionSet = function (key, val) {
+        try {
+            sessionStorage.setItem(key, val);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+    var removeLocalLogin = function () {
+        [
+            Constants.userNameKey,
+            Constants.userHashKey,
+            Constants.blockHashKey,
+            Constants.sessionJWT,
+            Constants.ssoSeed,
+            Constants.tokenKey,
+        ].forEach(function (k) {
+            localStorage.removeItem(k);
+            delete localStorage[k];
+        });
+    };
+    var removeWalletSession = function () {
+        [
+            pftWalletSessionKey,
+            Constants.userNameKey,
+            Constants.userHashKey,
+            Constants.blockHashKey,
+            Constants.sessionJWT,
+            Constants.ssoSeed,
+            Constants.tokenKey,
+        ].forEach(function (k) {
+            sessionStorage.removeItem(k);
+            delete sessionStorage[k];
+        });
+    };
+    var isWalletAddress = function (name) {
+        return typeof(name) === 'string' && pftWalletAddressPattern.test(name);
+    };
+    var hasWalletSession = function () {
+        return sessionStorage[pftWalletSessionKey] === '1';
+    };
+    var hasPersistentWalletLogin = function () {
+        return !hasWalletSession() &&
+            isWalletAddress(localStorage[Constants.userNameKey]) &&
+            typeof(localStorage[Constants.blockHashKey]) === 'string';
     };
 
     LocalStore.setThumbnail = function (key, value, cb) {
@@ -52,16 +99,23 @@ define([
     };
 
     LocalStore.getUserHash = function () {
-        var hash = localStorage[Constants.userHashKey];
+        var store = hasWalletSession() ? sessionStorage : localStorage;
+        var hash = store[Constants.userHashKey];
 
         if (['undefined', 'undefined/'].indexOf(hash) !== -1) {
-            localStorage.removeItem(Constants.userHashKey);
+            store.removeItem(Constants.userHashKey);
             return;
         }
 
         if (hash) {
             var sHash = Hash.serializeHash(hash);
-            if (sHash !== hash) { safeSet(Constants.userHashKey, sHash); }
+            if (sHash !== hash) {
+                if (hasWalletSession()) {
+                    safeSessionSet(Constants.userHashKey, sHash);
+                } else {
+                    safeSet(Constants.userHashKey, sHash);
+                }
+            }
         }
 
         return hash;
@@ -69,34 +123,48 @@ define([
 
     LocalStore.setUserHash = function (hash) {
         var sHash = Hash.serializeHash(hash);
+        if (hasWalletSession()) { return void safeSessionSet(Constants.userHashKey, sHash); }
         safeSet(Constants.userHashKey, sHash);
     };
 
     LocalStore.getBlockHash = function () {
+        if (hasWalletSession()) { return sessionStorage[Constants.blockHashKey]; }
+        if (hasPersistentWalletLogin()) { return; }
         return localStorage[Constants.blockHashKey];
     };
 
     LocalStore.setBlockHash = function (hash) {
+        if (hasWalletSession()) { return void safeSessionSet(Constants.blockHashKey, hash); }
         safeSet(Constants.blockHashKey, hash);
     };
 
     LocalStore.getSessionToken = function () {
+        if (hasWalletSession()) { return sessionStorage[Constants.sessionJWT]; }
         return localStorage[Constants.sessionJWT];
     };
 
     LocalStore.setSessionToken = function (token) {
+        if (hasWalletSession()) { return void safeSessionSet(Constants.sessionJWT, token); }
         safeSet(Constants.sessionJWT, token);
     };
 
     LocalStore.getSSOSeed = function () {
+        if (hasWalletSession()) { return sessionStorage[Constants.ssoSeed]; }
         return localStorage[Constants.ssoSeed];
     };
     LocalStore.setSSOSeed = function (seed) {
+        if (hasWalletSession()) { return void safeSessionSet(Constants.ssoSeed, seed); }
         safeSet(Constants.ssoSeed, seed);
     };
 
     LocalStore.getAccountName = function () {
+        if (hasWalletSession()) { return sessionStorage[Constants.userNameKey]; }
+        if (hasPersistentWalletLogin()) { return; }
         return localStorage[Constants.userNameKey];
+    };
+
+    LocalStore.isWalletSession = function () {
+        return hasWalletSession();
     };
 
     LocalStore.isLoggedIn = function () {
@@ -110,7 +178,8 @@ define([
     };
 
     LocalStore.clearLoginToken = function () {
-        localStorage.removeItem(Constants.loginToken);
+        localStorage.removeItem(Constants.tokenKey);
+        sessionStorage.removeItem(Constants.tokenKey);
     };
 
     LocalStore.setDriveRedirectPreference = function (bool) {
@@ -134,6 +203,21 @@ define([
         safeSet(Constants.userNameKey, name);
         if (cb) { cb(); }
     };
+    LocalStore.walletLogin = function (userHash, blockHash, name, cb) {
+        if (!userHash && !blockHash) { throw new Error('expected a user hash'); }
+        if (!name) { throw new Error('expected a user name'); }
+        removeLocalLogin();
+        removeWalletSession();
+        safeSessionSet(pftWalletSessionKey, '1');
+        if (userHash) { safeSessionSet(Constants.userHashKey, Hash.serializeHash(userHash)); }
+        if (blockHash) { safeSessionSet(Constants.blockHashKey, blockHash); }
+        safeSessionSet(Constants.userNameKey, name);
+        if (cb) { cb(); }
+    };
+    LocalStore.lockWallet = function (cb) {
+        removeWalletSession();
+        if (cb) { cb(); }
+    };
     var logoutHandlers = [];
     LocalStore.logout = function (cb, isDeletion) {
         [
@@ -142,7 +226,7 @@ define([
             Constants.blockHashKey,
             Constants.sessionJWT,
             Constants.ssoSeed,
-            'loginToken',
+            Constants.tokenKey,
             'plan',
         ].forEach(function (k) {
             localStorage.removeItem(k);
