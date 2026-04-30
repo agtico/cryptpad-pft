@@ -14,7 +14,14 @@ Upstream base:
 9004ad2dd1b40d571b25f66dfe968606233f51a8
 ```
 
-No application code has been modified yet. The fork currently contains upstream CryptPad plus Post Fiat planning docs.
+The fork now contains upstream CryptPad plus Post Fiat planning docs and the first wallet-login foundation.
+
+Implemented so far:
+
+- `src/postfiat/wallet-core.mjs`: Task Node style 24-word BIP39 mnemonic, XRPL wallet derivation, and message signing/verification.
+- `src/common/postfiat-wallet-auth.js`: canonical Post Fiat login/access messages plus wallet-signature-to-CryptPad-entropy derivation.
+- `www/common/common-login.js`: accepts `walletAuth` without breaking stock password login, uses wallet-derived entropy, preserves wallet address casing, and makes wallet login idempotent.
+- `scripts/tests/postfiat-wallet-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, and PFT channel bytes.
 
 ## Do Not Re-Discover These First
 
@@ -32,13 +39,12 @@ Use these local repos as references:
 
 ## Recommended Implementation Order
 
-1. Create a `customize/www/postfiat/` area for wallet modules and UI glue.
-2. Port Task Node wallet derivation/session code first.
-3. Port the existing `walletAuth` CryptPad login changes from `pfdapp/cryptpad/www/common/common-login.js`.
-4. Make wallet login work before touching sharing.
-5. Port PFTL key lookup/publication.
-6. Add share-to-wallet bridge for CryptPad URL secrets.
-7. Only then start native PFTL document integration and broad UI redesign.
+1. Create a wallet unlock/restore UI that calls `Login.loginOrRegister({ walletAuth })`.
+2. Add encrypted wallet-at-rest storage and session restore.
+3. Prove wallet login in a browser against a local CryptPad instance.
+4. Port PFTL key lookup/publication.
+5. Add share-to-wallet bridge for CryptPad URL secrets.
+6. Only then start native PFTL document integration and broad UI redesign.
 
 ## Key Technical Decisions Already Made
 

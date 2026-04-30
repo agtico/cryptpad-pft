@@ -20,23 +20,23 @@ Status values:
 
 ## Phase 1: Wallet Core
 
-- [ ] Port Task Node BIP39 wallet primitives into this fork as a browser module.
-- [ ] Use `@scure/bip39` and XRPL `Wallet.fromMnemonic` with path `m/44'/144'/0'/0/0`.
-- [ ] Implement create wallet, restore wallet, unlock wallet, lock wallet.
+- [~] Port Task Node BIP39 wallet primitives into this fork as a browser module.
+- [x] Use `@scure/bip39` and XRPL `Wallet.fromMnemonic` with path `m/44'/144'/0'/0/0`.
+- [~] Implement create wallet, restore wallet, unlock wallet, lock wallet.
 - [ ] Store encrypted wallet payload with PBKDF2-SHA256/AES-GCM or a reviewed stronger KDF.
 - [ ] Use session-only unlocked mnemonic handling patterned after `pftasks/app/src/lib/wallet/session.js`.
-- [ ] Add wallet signing helper for canonical Post Fiat login/access messages.
+- [x] Add wallet signing helper for canonical Post Fiat login/access messages.
 - [ ] Add MetaMask PFTL Snap support as an optional wallet provider.
-- [ ] Add tests for mnemonic normalization, derivation path, address derivation, and signature verification.
+- [x] Add tests for mnemonic normalization, derivation path, address derivation, and signature verification.
 
 ## Phase 2: Wallet Login Into CryptPad
 
-- [~] Port existing `walletAuth` derivation from `pfdapp/cryptpad/www/common/common-login.js`.
-- [ ] Remove debug logging from the old prototype before porting.
-- [ ] Standardize one canonical login signing message.
-- [ ] Derive the 192-byte CryptPad login entropy from wallet signature.
-- [ ] Use wallet address as the CryptPad username.
-- [ ] Make wallet login idempotent: first use registers, later use logs in.
+- [x] Port existing `walletAuth` derivation from `pfdapp/cryptpad/www/common/common-login.js`.
+- [x] Remove debug logging from the old prototype before porting.
+- [x] Standardize one canonical login signing message.
+- [x] Derive the 192-byte CryptPad login entropy from wallet signature.
+- [x] Use wallet address as the CryptPad username.
+- [x] Make wallet login idempotent: first use registers, later use logs in.
 - [ ] Decide migration behavior for old username/password users.
 - [ ] Add wallet-login UI for create/restore/unlock.
 - [ ] Add server nonce session only where server authorization is needed.
@@ -115,8 +115,8 @@ Status values:
 
 ## Immediate Next Tasks
 
-1. Push this fork to `agtico/cryptpad-pft`.
-2. Port wallet modules from `pftasks/app/src/lib/wallet` into a new Post Fiat customization module.
-3. Port the cleaned `walletAuth` login path from `pfdapp/cryptpad`.
-4. Build the first wallet unlock/login screen.
+1. Build the first wallet unlock/login screen.
+2. Connect the Task Node mnemonic wallet to `walletAuth` in the login UI.
+3. Add encrypted wallet-at-rest storage and session restore.
+4. Run a browser e2e test proving the same 24-word seed recovers the same CryptPad drive.
 5. Implement a minimal share-to-wallet bridge that encrypts a CryptPad URL secret as a PFTL v3 document.

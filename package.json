@@ -14,6 +14,7 @@
   "dependencies": {
     "@mcrowe/minibloom": "^0.2.0",
     "@node-saml/node-saml": "^5.1.0",
+    "@scure/bip39": "^2.2.0",
     "alertify.js": "1.0.11",
     "body-parser": "^1.20.4",
     "bootstrap": "^4.0.0",
@@ -41,6 +42,7 @@
     "json.sortify": "github:cryptpad/JSON.sortify",
     "jsonwebtoken": "^9.0.3",
     "jszip": "3.10.1",
+    "libsodium-wrappers": "^0.8.4",
     "localforage": "^1.5.2",
     "marked": "^4.3.0",
     "mathjax": "3.0.5",
@@ -54,6 +56,7 @@
     "require-css": "0.1.10",
     "requirejs": "2.3.7",
     "requirejs-plugins": "^1.0.2",
+    "ripple-keypairs": "^2.0.0",
     "saferphore": "0.0.1",
     "scrypt-async": "1.2.0",
     "sortablejs": "^1.6.0",
@@ -64,7 +67,8 @@
     "tweetnacl-util": "^0.15.1",
     "ulimit": "0.0.2",
     "ws": "^8.17.1",
-    "x2js": "^3.4.4"
+    "x2js": "^3.4.4",
+    "xrpl": "^4.6.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.0",
@@ -103,6 +107,7 @@
     "lint:translations": "node ./scripts/translations/lint-translations.js",
     "unused-translations": "node ./scripts/translations/unused-translations.js",
     "test": "node scripts/TestSelenium.js",
+    "test:postfiat": "node --test scripts/tests/postfiat-wallet-auth.test.js scripts/tests/postfiat-wallet-core.test.mjs",
     "test-rpc": "cd scripts/tests && node test-rpc",
     "evict-inactive": "node scripts/evict-inactive.js",
     "build": "node scripts/build.js",

@@ -18,18 +18,20 @@ define([
     '/common/outer/login-block.js',
     '/common/common-hash.js',
     '/common/outer/http-command.js',
+    '/common/postfiat-wallet-auth.js',
 
     '/components/tweetnacl/nacl-fast.min.js',
     '/components/scrypt-async/scrypt-async.min.js', // better load speed
 ], function (Listmap, Crypto, Util, NetConfig, Cred, ChainPad, Realtime, Constants,
-            Feedback, LocalStore, Messages, nThen, Block, Hash, ServerCommand) {
+            Feedback, LocalStore, Messages, nThen, Block, Hash, ServerCommand, WalletAuth) {
     var Nacl = window.nacl;
 
     var Exports = {
         requiredBytes: 192,
     };
 
-    var allocateBytes = Exports.allocateBytes = function (bytes) {
+    var allocateBytes = Exports.allocateBytes = function (bytes, options) {
+        options = options || {};
         var dispense = Cred.dispenser(bytes);
 
         var opt = {};
@@ -63,8 +65,12 @@ define([
         // 24 bytes of base64
         keys.editKeyStr = keys.editKeyStr.replace(/\//g, '-');
 
-        // 32 bytes of hex
-        var channelHex = opt.channelHex = Util.uint8ArrayToHex(channelSeed);
+        // 32 bytes of hex. Wallet-derived accounts use the established PFT
+        // derivation path from the previous CryptPad prototype; password
+        // accounts keep CryptPad's original allocation.
+        var channelBytes = options.walletDerived ?
+            WalletAuth.deriveWalletChannelBytes(encryptionSeed) : channelSeed;
+        var channelHex = opt.channelHex = Util.uint8ArrayToHex(channelBytes);
 
         // should never happen
         if (channelHex.length !== 32) { throw new Error('invalid channel id'); }
@@ -75,6 +81,7 @@ define([
         // derive the same values as it always has. New accounts will generate their own
         // userHash values
         opt.userHash = '/1/edit/' + [channel64, opt.keys.editKeyStr].join('/') + '/';
+        opt.isWallet = Boolean(options.walletDerived);
 
         return opt;
     };
@@ -155,6 +162,13 @@ define([
 
             // they tried to register, but those exact credentials exist
             if (isRegister && !isProxyEmpty(rt.proxy)) {
+                if (opt.isWallet) {
+                    // Wallet login is intentionally idempotent: first use
+                    // registers, later use opens the same derived drive.
+                    return void LocalStore.login(undefined, res.blockHash, res.uname, function () {
+                        cb(void 0, res, rt);
+                    });
+                }
                 Feedback.send('LOGIN', true);
                 return void cb('ALREADY_REGISTERED');
             }
@@ -198,11 +212,29 @@ define([
         });
     };
 
-    var getProxyOpt = function (blockInfo) {
+    var getProxyOpt = function (blockInfo, walletOpt) {
         var opt;
         if (blockInfo) {
             opt = loginOptionsFromBlock(blockInfo);
             opt.userHash = blockInfo.User_hash;
+            if (walletOpt) {
+                opt.isWallet = true;
+                opt.edPrivate = walletOpt.edPrivate;
+                opt.edPublic = walletOpt.edPublic;
+                opt.curvePrivate = walletOpt.curvePrivate;
+                opt.curvePublic = walletOpt.curvePublic;
+            }
+        } else if (walletOpt) {
+            opt = {
+                isWallet: true,
+                edPrivate: walletOpt.edPrivate,
+                edPublic: walletOpt.edPublic,
+                curvePrivate: walletOpt.curvePrivate,
+                curvePublic: walletOpt.curvePublic,
+                keys: walletOpt.keys,
+                channelHex: walletOpt.channelHex,
+                userHash: walletOpt.userHash,
+            };
         } else {
             console.log("allocating random bytes for a new user object");
             opt = allocateBytes(Nacl.randomBytes(Exports.requiredBytes));
@@ -213,7 +245,6 @@ define([
             opt.channelHex = secret.channel;
         }
 
-        console.warn(opt);
         return opt;
     };
 
@@ -255,6 +286,12 @@ define([
 
             // they tried to register, but those exact credentials exist
             if (isRegister && !isProxyEmpty(rt.proxy)) {
+                if (opt.isWallet) {
+                    Feedback.send('LOGIN', true);
+                    return void LocalStore.login(undefined, res.blockHash, res.uname, function () {
+                        cb(void 0, res, RT);
+                    });
+                }
                 //rt.network.disconnect();
                 return void cb('ALREADY_REGISTERED');
             }
@@ -292,16 +329,21 @@ define([
     };
 
     Exports.loginOrRegister = function (config, cb) {
-        let { uname, passwd, token, isRegister, onOTP, ssoAuth } = config;
+        let { uname, passwd, token, isRegister, onOTP, ssoAuth, walletAuth } = config;
         if (typeof(cb) !== 'function') { return; }
 
-        // Usernames are all lowercase. No going back on this one
-        uname = uname.toLowerCase();
+        var isWalletAuth = Boolean(walletAuth && walletAuth.signature);
+        if (isWalletAuth) {
+            uname = walletAuth.address || uname;
+        } else {
+            // Usernames are all lowercase. No going back on this one
+            uname = uname.toLowerCase();
+        }
 
         // validate inputs
         if (!Cred.isValidUsername(uname)) { return void cb('INVAL_USER'); }
-        if (!Cred.isValidPassword(passwd) && !ssoAuth) { return void cb('INVAL_PASS'); }
-        if (isRegister && !ssoAuth && !Cred.isLongEnoughPassword(passwd)) {
+        if (!isWalletAuth && !Cred.isValidPassword(passwd) && !ssoAuth) { return void cb('INVAL_PASS'); }
+        if (isRegister && !isWalletAuth && !ssoAuth && !Cred.isLongEnoughPassword(passwd)) {
             return void cb('PASS_TOO_SHORT');
         }
 
@@ -315,6 +357,21 @@ define([
         var RT, blockKeys, blockUrl;
 
         nThen(function (waitFor) {
+            if (isWalletAuth) {
+                try {
+                    var entropy = WalletAuth.deriveCryptPadEntropy(walletAuth.signature, Exports.requiredBytes);
+                    res.opt = allocateBytes(entropy, { walletDerived: true });
+                    res.blockHash = res.opt.blockHash;
+                    blockKeys = res.opt.blockKeys;
+                    isRegister = true;
+                    return;
+                } catch (err) {
+                    console.error(err);
+                    waitFor.abort();
+                    return void cb('WALLET_AUTH_DERIVATION_ERROR');
+                }
+            }
+
             // derive a predefined number of bytes from the user's inputs,
             // and allocate them in a deterministic fashion
             Cred.deriveFromPassphrase(uname, passwd, Exports.requiredBytes, waitFor(function (bytes) {
@@ -502,7 +559,7 @@ define([
                 cb(void 0, data);
             }), res);
         }).nThen(function (waitFor) { // MODERN REGISTRATION / LOGIN
-            var opt = getProxyOpt(res.blockInfo);
+            var opt = getProxyOpt(res.blockInfo, isWalletAuth ? res.opt : null);
 
             LocalStore.setSessionToken('');
             modernLoginRegister(opt, isRegister, waitFor(function (err, data, _RT) {
@@ -533,8 +590,8 @@ define([
             // Only SSO users and invited users can be stored by the server and it needs to be configured
             var userData = (token || ssoAuth) ? [uname, RT.proxy.edPublic] : undefined;
             Block.writeLoginBlock({
-                pw: Boolean(passwd),
-                auth: ssoAuth,
+                pw: isWalletAuth ? false : Boolean(passwd),
+                auth: isWalletAuth ? walletAuth.auth : ssoAuth,
                 blockKeys: blockKeys,
                 token: token,
                 content: toPublish,
