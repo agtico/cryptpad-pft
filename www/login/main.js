@@ -26,6 +26,11 @@ define([
             document.location.href = '/drive/';
             return;
         }
+        LocalStore.requestWalletSession(function (imported) {
+            if (imported) {
+                document.location.href = '/drive/';
+            }
+        });
 
         const forceStandardLogin = window.location.hash === "#standard-login";
         if (Config.sso) {

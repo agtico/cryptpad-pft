@@ -104,6 +104,47 @@ test('wallet logins store the login capability in session storage only', () => {
     assert.equal(sessionStorage[Constants.blockHashKey], 'wallet-block');
 });
 
+test('wallet sessions can be exported and imported into a new tab', () => {
+    const address = 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC';
+    const source = loadLocalStore();
+    const target = loadLocalStore();
+
+    source.LocalStore.walletLogin('/user/hash/', 'wallet-block', address);
+    source.LocalStore.setSessionToken('session-jwt');
+    source.LocalStore.setSSOSeed('sso-seed');
+    source.sessionStorage[Constants.tokenKey] = 'login-token';
+
+    const payload = source.LocalStore.exportWalletSession();
+
+    assert.deepEqual(JSON.parse(JSON.stringify(payload)), {
+        version: 1,
+        userName: address,
+        blockHash: 'wallet-block',
+        userHash: '/user/hash/',
+        sessionJWT: 'session-jwt',
+        ssoSeed: 'sso-seed',
+        token: 'login-token',
+    });
+    assert.equal(target.LocalStore.importWalletSession(payload), true);
+    assert.equal(target.LocalStore.isWalletSession(), true);
+    assert.equal(target.LocalStore.isLoggedIn(), true);
+    assert.equal(target.LocalStore.getAccountName(), address);
+    assert.equal(target.LocalStore.getBlockHash(), 'wallet-block');
+    assert.equal(target.LocalStore.getSessionToken(), 'session-jwt');
+    assert.equal(target.LocalStore.getSSOSeed(), 'sso-seed');
+    assert.equal(target.localStorage[Constants.blockHashKey], undefined);
+});
+
+test('wallet session imports reject non-wallet identities', () => {
+    const { LocalStore } = loadLocalStore();
+
+    assert.equal(LocalStore.importWalletSession({
+        userName: 'alice',
+        blockHash: 'wallet-block',
+    }), false);
+    assert.equal(LocalStore.isLoggedIn(), false);
+});
+
 test('wallet lock clears only the current wallet session', () => {
     const { LocalStore, sessionStorage } = loadLocalStore();
 

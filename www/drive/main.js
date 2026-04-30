@@ -8,11 +8,15 @@ define([
     '/api/config',
     '/common/dom-ready.js',
     '/common/sframe-common-outer.js',
-], function (nThen, ApiConfig, DomReady, SFCommonO) {
+    '/common/outer/local-store.js',
+], function (nThen, ApiConfig, DomReady, SFCommonO, LocalStore) {
 
     // Loaded in load #2
     var hash, href;
     nThen(function (waitFor) {
+        if (LocalStore.isLoggedIn()) { return; }
+        LocalStore.requestWalletSession(waitFor());
+    }).nThen(function (waitFor) {
         DomReady.onReady(waitFor());
     }).nThen(function (waitFor) {
         var obj = SFCommonO.initIframe(waitFor, true);
