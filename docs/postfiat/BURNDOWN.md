@@ -66,8 +66,8 @@ Status values:
 - [x] Package pad capability secrets as a canonical live-pad share payload.
 - [x] Encrypt live-pad share payloads with NIP-44 and wrap/deliver them with NIP-59/NIP-17 style private events.
 - [~] Add "Share to wallet" as the primary share action in the CryptPad share modal.
-- [ ] Add "Shared with me" inbox based on encrypted Nostr relay messages, not on-chain pointer scans.
-- [ ] Let recipient import/open a received live pad from the private inbox.
+- [~] Add "Shared with me" inbox based on encrypted Nostr relay messages, not on-chain pointer scans.
+- [~] Let recipient import/open a received live pad from the private inbox.
 - [x] Add UI-ready workflow helpers that publish and open live-pad private shares from PFT wallet mnemonics.
 - [x] Bundle the private-share workflow for browser use.
 - [x] Let the browser share workflow accept a recipient Nostr pubkey plus relay list before full wallet-directory discovery exists.
@@ -137,7 +137,7 @@ Status values:
 ## Immediate Next Tasks
 
 1. Add browser e2e tests for wallet-first login, saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
-2. Add a private "Shared with me" Nostr inbox before adding any on-chain/IPFS pointer inbox.
-3. Add browser-level integration tests against a local or fake Nostr relay.
-4. Add wallet/contact directory discovery so users do not paste raw pubkeys or inbox JSON.
+2. Add browser-level integration tests against a local or fake Nostr relay for share publish, inbox refresh, open, and save.
+3. Add wallet/contact directory discovery so users do not paste raw pubkeys or inbox JSON.
+4. Improve the first-pass Post Fiat share/inbox UI styling and mobile layout.
 5. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.

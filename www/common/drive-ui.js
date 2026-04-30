@@ -26,6 +26,8 @@ define([
     '/customize/pages.js',
     '/common/pad-types.js',
     '/common/onlyoffice/broken-formats.js',
+    '/common/postfiat-wallet-core.bundle.js',
+    '/common/postfiat-private-share.bundle.js',
     '/common/common-icons.js'
 ], function (
     $,
@@ -3840,10 +3842,186 @@ define([
                 checkCollapseButton();
             });
         };
+
+        var getPostFiatRelays = function () {
+            var nostr = (ApiConfig.postFiat && ApiConfig.postFiat.nostr) || {};
+            var relays = Array.isArray(nostr.privateRelays) && nostr.privateRelays.length ?
+                nostr.privateRelays : nostr.relays;
+            return Array.isArray(relays) ? relays : [];
+        };
+
+        var parsePostFiatRelayInput = function (value) {
+            return String(value || '').split(/[\s,]+/u)
+                .map(function (relay) { return relay.trim(); })
+                .filter(Boolean);
+        };
+
+        var getPostFiatSessionWallet = async function () {
+            var Core = window.PostFiatWalletCore;
+            if (!Core || typeof(Core.restoreSessionWallet) !== 'function') {
+                throw new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE');
+            }
+            var session = await Core.restoreSessionWallet();
+            if (!session || !session.mnemonic) {
+                throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
+            }
+            return session;
+        };
+
+        var getPostFiatPayloadHref = function (payload) {
+            return Hash.getRelativeHref(payload && payload.href) || (payload && payload.href);
+        };
+
+        var openPostFiatPayload = function (payload) {
+            var href = getPostFiatPayloadHref(payload);
+            if (!href) { return void UI.warn(Messages.error); }
+            if (href.charAt(0) === '/') {
+                common.openURL(href);
+                return;
+            }
+            common.openUnsafeURL(href);
+        };
+
+        var savePostFiatPayloadToDrive = function (payload) {
+            var href = getPostFiatPayloadHref(payload);
+            if (!href) { return void UI.warn(Messages.error); }
+            common.getSframeChannel().query('Q_STORE_IN_TEAM', {
+                href: href,
+                password: payload.password,
+                path: ['root'],
+                title: payload.title || '',
+                teamId: -1
+            }, function (err) {
+                if (err) {
+                    console.error(err);
+                    return void UI.warn(Messages.error);
+                }
+                UI.log(Messages.saved);
+                refresh();
+            });
+        };
+
+        var openPostFiatInboxModal = function () {
+            var ShareWorkflow = window.PostFiatPrivateShare;
+            var relays = getPostFiatRelays();
+            var relayInput = h('textarea.form-control#cp-drive-pft-inbox-relays', {
+                rows: 2,
+                spellcheck: false,
+                placeholder: 'wss://relay.example'
+            }, relays.join('\n'));
+            var status = h('div.cp-drive-pft-inbox-status', { role: 'status' });
+            var list = h('div.list-group.cp-drive-pft-inbox-list');
+            var content = h('div.cp-drive-pft-inbox', [
+                h('label.cp-default-label', { for: 'cp-drive-pft-inbox-relays' }, 'Relays'),
+                relayInput,
+                h('div.cp-spacer'),
+                list,
+                status
+            ]);
+            var $list = $(list);
+            var setStatus = function (text, warning) {
+                $(status).text(text || '').toggleClass('alert alert-warning', Boolean(warning));
+            };
+            var renderShares = function (shares) {
+                $list.empty();
+                if (!shares.length) {
+                    $list.append(h('div.list-group-item', 'No private shares found.'));
+                    return;
+                }
+                shares.forEach(function (share) {
+                    var payload = share.payload || {};
+                    var href = getPostFiatPayloadHref(payload) || '';
+                    var openButton = h('button.btn.btn-secondary', [
+                        Icons.get('external-link'),
+                        'Open'
+                    ]);
+                    var saveButton = h('button.btn.btn-primary', [
+                        Icons.get('drive'),
+                        'Save'
+                    ]);
+                    $(openButton).on('click', function () {
+                        openPostFiatPayload(payload);
+                    });
+                    $(saveButton).on('click', function () {
+                        savePostFiatPayloadToDrive(payload);
+                    });
+                    $list.append(h('div.list-group-item.cp-drive-pft-inbox-item', [
+                        h('div.cp-drive-pft-inbox-title', payload.title || 'Untitled document'),
+                        h('div.cp-drive-pft-inbox-meta', [
+                            payload.mode || 'view',
+                            payload.createdAt ? ' - ' + payload.createdAt : ''
+                        ]),
+                        h('div.cp-drive-pft-inbox-href', href.slice(0, 160)),
+                        h('div.cp-spacer'),
+                        h('div.btn-group', [
+                            openButton,
+                            saveButton
+                        ])
+                    ]));
+                });
+            };
+            var fetchInbox = function () {
+                if (!ShareWorkflow ||
+                        typeof(ShareWorkflow.fetchAndOpenLivePadPrivateShares) !== 'function') {
+                    UI.warn('Post Fiat private sharing code is unavailable.');
+                    return true;
+                }
+                var relayList = parsePostFiatRelayInput($(relayInput).val());
+                setStatus('Refreshing...');
+                getPostFiatSessionWallet().then(function (session) {
+                    return ShareWorkflow.fetchAndOpenLivePadPrivateShares({
+                        recipientMnemonic: session.mnemonic,
+                        relayUrls: relayList,
+                        postFiatConfig: ApiConfig.postFiat,
+                        fallbackRelays: relayList,
+                        origin: metadataMgr.getPrivateData().origin || window.location.origin,
+                        limit: 50,
+                        timeoutMs: 10000
+                    });
+                }).then(function (inbox) {
+                    renderShares(inbox.shares);
+                    setStatus(inbox.failures.length ?
+                        inbox.failures.length + ' private share(s) could not be decrypted.' :
+                        'Refreshed.');
+                }).catch(function (err) {
+                    renderShares([]);
+                    setStatus(err.message || String(err), true);
+                    UI.warn('Unable to refresh Post Fiat shares.');
+                });
+                return true;
+            };
+            var modal = UI.dialog.customModal(content, {
+                buttons: [{
+                    className: 'cancel',
+                    name: Messages.cancel,
+                    onClick: function () {},
+                    keys: [27]
+                }, {
+                    className: 'primary',
+                    name: 'Refresh',
+                    iconClass: 'refresh',
+                    onClick: fetchInbox,
+                    keys: [13]
+                }]
+            });
+            UI.openCustomModal(modal, { wide: true });
+            setTimeout(fetchInbox);
+        };
+
         var createToolbar = function () {
             var $toolbar = APP.toolbar.$bottom;
             APP.toolbar.$bottomL.html('');
             APP.toolbar.$bottomR.html('');
+            if (APP.loggedIn && ApiConfig.postFiat) {
+                var $pftInbox = common.createButton(null, true, {
+                    text: 'Shared with me',
+                    name: 'pft-inbox',
+                    icon: 'inbox',
+                    tippy: 'Post Fiat shared with me',
+                    drawer: false
+                }, openPostFiatInboxModal);
+                APP.toolbar.$bottomR.append($pftInbox);
+            }
             if (APP.histConfig && (APP.loggedIn || !APP.newSharedFolder)) {
                 // ANON_SHARED_FOLDER
                 var $hist = common.createButton('history', true, {histConfig: APP.histConfig});
