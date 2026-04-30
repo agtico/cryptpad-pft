@@ -22,7 +22,8 @@ Implemented so far:
 - `src/postfiat/wallet-core.mjs`: encrypted saved-wallet vault helpers using PBKDF2-SHA256 and AES-GCM.
 - `src/common/postfiat-wallet-auth.js`: canonical Post Fiat login/access messages plus wallet-signature-to-CryptPad-entropy derivation.
 - `www/common/common-login.js`: accepts `walletAuth` without breaking stock password login, uses wallet-derived entropy, preserves wallet address casing, and makes wallet login idempotent.
-- `www/common/outer/local-store.js`: wallet logins store CryptPad login capabilities in `sessionStorage` only and ignore stale persisted wallet-looking `Block_hash` values.
+- `www/common/outer/local-store.js`: wallet logins store CryptPad login capabilities in `sessionStorage` only, ignore stale persisted wallet-looking `Block_hash` values, and use `BroadcastChannel` to hand an active wallet session to a new same-origin tab while an unlocked tab is open.
+- `www/drive/main.js` and `www/login/main.js`: request an active wallet session before falling back to anonymous drive or manual login.
 - `www/common/postfiat-wallet-core.bundle.js`: browser bundle for mnemonic derivation and message signing.
 - `customize.dist/pages/login.js` and `www/login/main.js`: minimal 24-word seed phrase login form, encrypted saved-wallet unlock, and `walletAuth` login.
 - `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, and wallet session storage.
@@ -59,6 +60,7 @@ Use these local repos as references:
 - Raw CryptPad URL sharing should be legacy/advanced, not the main PFT UX.
 - Revocation requires file-key/content rotation.
 - Wallet login should not leave a persistent CryptPad `Block_hash` in `localStorage`; it should unlock the current browser session only.
+- Manually opened new tabs can borrow the active wallet session through same-origin `BroadcastChannel`; if all wallet tabs are closed, the user must unlock from the seed phrase or encrypted saved wallet again.
 - Saved wallet vaults are encrypted locally with PBKDF2-SHA256/AES-GCM; the vault unlock password is not a CryptPad password.
 
 ## Known Traps
@@ -79,5 +81,6 @@ Use these local repos as references:
 - Sign the canonical login message.
 - Login/register into CryptPad with wallet-derived account material.
 - Reload the browser and recover the same drive.
+- Open a new same-origin `/drive/` tab while the first wallet tab is still unlocked and confirm it does not fall back to anonymous storage.
 - Share a live pad to a second wallet through a PFTL encrypted payload.
 - Recipient decrypts the pointer payload and opens/imports the pad.

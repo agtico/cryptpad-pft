@@ -39,6 +39,7 @@ Status values:
 - [x] Use wallet address as the CryptPad username.
 - [x] Make wallet login idempotent: first use registers, later use logs in.
 - [x] Prevent stale persisted wallet `Block_hash` values from silently auto-unlocking.
+- [x] Allow new same-origin tabs to import an active wallet session from an already-unlocked tab without persisting the login capability.
 - [ ] Decide migration behavior for old username/password users.
 - [~] Add wallet-login UI for create/restore/unlock.
 - [x] Add saved-wallet unlock path that avoids repeated seed paste.
@@ -119,7 +120,7 @@ Status values:
 ## Immediate Next Tasks
 
 1. Add wallet creation/onboarding with a save-confirm step.
-2. Add browser e2e tests for saved-wallet unlock, session lock, and drive recovery.
+2. Add browser e2e tests for saved-wallet unlock, session lock, cross-tab session handoff, and drive recovery.
 3. Add proper in-session mnemonic/key handling for PFTL sharing operations.
 4. Implement a minimal share-to-wallet bridge that encrypts a CryptPad URL secret as a PFTL v3 document.
 5. Start the visual redesign of login/drive around the Post Fiat shell.
