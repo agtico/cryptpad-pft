@@ -115,7 +115,7 @@ test('accepts pubkey-only private share recipients with configured relay fallbac
         },
         postFiatConfig: {
             nostr: {
-                privateRelays: ['wss://instance-relay.example/'],
+                privateRelays: ['wss://instance-relay.example/', 'wss://backup-relay.example'],
             },
         },
         origin: ORIGIN,
@@ -126,7 +126,7 @@ test('accepts pubkey-only private share recipients with configured relay fallbac
 
     assert.equal(built.recipient.publicKeyHex, identity.publicKeyHex);
     assert.equal(built.recipient.walletAddress, undefined);
-    assert.deepEqual(built.relays, ['wss://instance-relay.example']);
+    assert.deepEqual(built.relays, ['wss://instance-relay.example', 'wss://backup-relay.example']);
 });
 
 test('builds an own inbox directory from the current wallet mnemonic', async () => {

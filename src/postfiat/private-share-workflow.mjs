@@ -120,9 +120,9 @@ export const buildLivePadPrivateShare = async ({
             publicKeyHex: senderIdentity.publicKeyHex,
         },
         recipient: directory,
-        relays,
         payload,
         ...wrapped,
+        relays,
     };
 };
 
