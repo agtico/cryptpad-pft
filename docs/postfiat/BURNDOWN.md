@@ -41,6 +41,8 @@ Status values:
 - [x] Prevent stale persisted wallet `Block_hash` values from silently auto-unlocking.
 - [x] Add wallet-session import/export helpers for future explicit cross-tab unlock without persisting the login capability.
 - [x] Keep `/drive/` and `/login/` from silently importing active wallet sessions by default.
+- [x] Add public `postFiat.walletFirst` and `postFiat.disableLegacyLogin` instance config.
+- [x] Move legacy username/password login behind an explicit compatibility button by default.
 - [ ] Decide migration behavior for old username/password users.
 - [~] Add wallet-login UI for create/restore/unlock.
 - [x] Add saved-wallet unlock path that avoids repeated seed paste.
@@ -82,7 +84,7 @@ Status values:
 ## Phase 6: UI Redesign
 
 - [ ] Build a Post Fiat shell around CryptPad apps.
-- [ ] Replace stock landing/login surfaces with wallet-first flows.
+- [~] Replace stock landing/login surfaces with wallet-first flows.
 - [ ] Replace drive styling with a modern document workspace.
 - [ ] Add wallet account panel, balance/network state, and key publication state.
 - [ ] Add wallet contacts/address book.
@@ -121,7 +123,7 @@ Status values:
 ## Immediate Next Tasks
 
 1. Add wallet creation/onboarding with a save-confirm step.
-2. Add browser e2e tests for saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
+2. Add browser e2e tests for wallet-first login, saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
 3. Add proper in-session mnemonic/key handling for PFTL sharing operations.
 4. Implement a minimal share-to-wallet bridge that encrypts a CryptPad URL secret as a PFTL v3 document.
-5. Start the visual redesign of login/drive around the Post Fiat shell.
+5. Start the visual redesign of drive around the Post Fiat shell.

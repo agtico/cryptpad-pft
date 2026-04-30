@@ -25,7 +25,8 @@ Implemented so far:
 - `www/common/outer/local-store.js`: wallet logins store CryptPad login capabilities in `sessionStorage` only, ignore stale persisted wallet-looking `Block_hash` values, and expose `BroadcastChannel` helpers for future explicit cross-tab unlock.
 - `www/drive/main.js` and `www/login/main.js`: do not silently import an active wallet session; new tabs must unlock explicitly unless an explicit UI is added later.
 - `www/common/postfiat-wallet-core.bundle.js`: browser bundle for mnemonic derivation and message signing.
-- `customize.dist/pages/login.js` and `www/login/main.js`: minimal 24-word seed phrase login form, encrypted saved-wallet unlock, and `walletAuth` login.
+- `config/config.example.js`, `lib/env.js`, and `lib/http-worker.js`: public `postFiat.walletFirst` and `postFiat.disableLegacyLogin` config exposed through `/api/config`.
+- `customize.dist/pages/login.js` and `www/login/main.js`: wallet-first login surface with 24-word seed phrase login, encrypted saved-wallet unlock, and legacy username/password login behind a compatibility button by default.
 - `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, and wallet session storage.
 
 ## Do Not Re-Discover These First
@@ -45,7 +46,7 @@ Use these local repos as references:
 ## Recommended Implementation Order
 
 1. Add wallet creation/onboarding with a save-confirm step.
-2. Add browser e2e coverage for seed login, saved-wallet unlock, session lock, and drive recovery.
+2. Add browser e2e coverage for wallet-first login, seed login, saved-wallet unlock, session lock, and drive recovery.
 3. Add proper in-session mnemonic/key handling for PFTL sharing operations.
 4. Port PFTL key lookup/publication.
 5. Add share-to-wallet bridge for CryptPad URL secrets.
@@ -55,6 +56,7 @@ Use these local repos as references:
 
 - Primary login identity is the XRPL classic wallet address.
 - Primary wallet UX is Task Node 24-word seed phrase.
+- Username/password login is legacy compatibility. Keep it hidden by default, and only hard-disable it with `postFiat.disableLegacyLogin` after account migration is solved.
 - MetaMask Snap support is optional, not the only path.
 - Canonical share model is PFTL v3 ContentBlob/AccessManifest plus XRPL pointer memo.
 - Raw CryptPad URL sharing should be legacy/advanced, not the main PFT UX.

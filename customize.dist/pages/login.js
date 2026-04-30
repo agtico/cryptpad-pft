@@ -14,6 +14,12 @@ define([
 
         const ssoLength = Config?.sso?.list?.length;
         const forceStandardLogin = window.location.hash === "#standard-login";
+        const forceLegacyLogin = forceStandardLogin || window.location.hash === "#legacy-login";
+        const postFiat = Config.postFiat || {};
+        const walletFirst = postFiat.walletFirst !== false;
+        const legacyDisabled = postFiat.disableLegacyLogin === true;
+        var legacyHidden = (legacyDisabled || (walletFirst && !forceLegacyLogin)) ? '.cp-hidden' : '';
+        var legacyToggleHidden = (!walletFirst || legacyDisabled || forceLegacyLogin) ? '.cp-hidden' : '';
         var ssoEnabled = (ssoLength && !forceStandardLogin) ? '': '.cp-hidden';
         var ssoEnforced = (Config?.sso?.force && !forceStandardLogin) ? '.cp-hidden' : '';
         if (ssoLength === 1 && ssoEnforced) {
@@ -28,43 +34,6 @@ define([
                 h('div.row', [
                     h('div.col-md-3'+ssoEnforced),
                     h('div#userForm.form-group.col-md-6'+ssoEnforced, [
-                        h('div.cp-login-instance', Msg._getKey('login_instance', [ Pages.Instance.name ])),
-                        h('div.big-container', [
-                            h('div.input-container', [
-                                h('label.cp-default-label', { for: 'name' }, Msg.login_username),
-                                h('input.form-control#name', {
-                                    name: 'name',
-                                    type: 'text',
-                                    autocomplete: 'off',
-                                    autocorrect: 'off',
-                                    autocapitalize: 'off',
-                                    spellcheck: false,
-                                    placeholder: Msg.login_username,
-                                    autofocus: true,
-                                }),
-                            ]),
-                            h('div.input-container', [
-                                h('label.cp-default-label', { for: 'password' }, Msg.login_password),
-                                h('input.form-control#password', {
-                                    type: 'password',
-                                    'name': 'password',
-                                    placeholder: Msg.login_password,
-                                    autocomplete: "current-password"
-                                }),
-                            ]),
-                        ]),
-                        h('div.checkbox-container', [
-                            UI.createCheckbox('import-recent', Msg.register_importRecent),
-                        ]),
-                        h('div.extra', [
-                            (Config.restrictRegistration?
-                                h('div'):
-                                h('a#register', {
-                                    href: "/register/",
-                                }, Msg.login_register)
-                            ),
-                            h('button.login', Msg.login_login),
-                        ]),
                         h('div.cp-postfiat-wallet-login', [
                             h('div.cp-login-instance', 'Post Fiat wallet'),
                             h('div#pft-saved-wallet.cp-hidden', [
@@ -123,6 +92,49 @@ define([
                                 h('button#pft-wallet-login.btn.btn-primary', {
                                     type: 'button',
                                 }, 'Log in with seed'),
+                            ]),
+                        ]),
+                        h('div.checkbox-container', [
+                            UI.createCheckbox('import-recent', Msg.register_importRecent),
+                        ]),
+                        h('div.extra'+legacyToggleHidden, [
+                            h('button#pft-show-legacy-login.btn.btn-secondary', {
+                                type: 'button',
+                            }, 'Legacy CryptPad login'),
+                        ]),
+                        h('div#pft-legacy-login.cp-legacy-login'+legacyHidden, [
+                            h('div.cp-login-instance', 'Legacy CryptPad login'),
+                            h('div.big-container', [
+                                h('div.input-container', [
+                                    h('label.cp-default-label', { for: 'name' }, Msg.login_username),
+                                    h('input.form-control#name', {
+                                        name: 'name',
+                                        type: 'text',
+                                        autocomplete: 'off',
+                                        autocorrect: 'off',
+                                        autocapitalize: 'off',
+                                        spellcheck: false,
+                                        placeholder: Msg.login_username,
+                                    }),
+                                ]),
+                                h('div.input-container', [
+                                    h('label.cp-default-label', { for: 'password' }, Msg.login_password),
+                                    h('input.form-control#password', {
+                                        type: 'password',
+                                        'name': 'password',
+                                        placeholder: Msg.login_password,
+                                        autocomplete: "current-password"
+                                    }),
+                                ]),
+                            ]),
+                            h('div.extra', [
+                                (Config.restrictRegistration?
+                                    h('div'):
+                                    h('a#register', {
+                                        href: "/register/",
+                                    }, Msg.login_register)
+                                ),
+                                h('button.login', Msg.login_login),
                             ]),
                         ]),
                     ]),

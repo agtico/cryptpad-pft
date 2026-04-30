@@ -108,6 +108,16 @@ module.exports = {
  */
     // websocketPort: 3003,
 
+/*  Post Fiat wallet-native login is enabled by default in this fork.
+ *  `walletFirst` keeps the Post Fiat wallet unlock/seed form as the primary login path.
+ *  `disableLegacyLogin` hides the old CryptPad username/password login on /login/.
+ *  Keep legacy login enabled while migrating old accounts.
+ */
+    postFiat: {
+        walletFirst: true,
+        disableLegacyLogin: false,
+    },
+
 /*  CryptPad will launch a child process for every core available
  *  in order to perform CPU-intensive tasks in parallel.
  *  Some host environments may have a very large number of cores available

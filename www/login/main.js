@@ -28,6 +28,10 @@ define([
         }
 
         const forceStandardLogin = window.location.hash === "#standard-login";
+        const forceLegacyLogin = forceStandardLogin || window.location.hash === "#legacy-login";
+        const postFiat = Config.postFiat || {};
+        const walletFirst = postFiat.walletFirst !== false;
+        const legacyDisabled = postFiat.disableLegacyLogin === true;
         if (Config.sso) {
             // Config.sso.force => no legacy login allowed
             // Config.sso.password => cp password required or forbidden
@@ -81,18 +85,27 @@ define([
         };
         loginReady();
 
-        var $uname = $('#name').focus();
+        var $legacyLogin = $('#pft-legacy-login');
+        var $showLegacyLogin = $('#pft-show-legacy-login');
+        var $uname = $('#name');
 
         var $passwd = $('#password')
         // background loading of login assets
         // enter key while on password field clicks signup
         .on('keydown', function (e) {
+            if (legacyDisabled) { return; }
             if (e.which !== 13) { return; } // enter
             $('button.login').click();
+        });
+        $showLegacyLogin.click(function () {
+            $legacyLogin.removeClass('cp-hidden');
+            $showLegacyLogin.parent().addClass('cp-hidden');
+            $uname.focus();
         });
 
         //var test;
         $('button.login').click(function () {
+            if (legacyDisabled) { return; }
             var shouldImport = $checkImport[0].checked;
             var uname = $uname.val();
             var passwd = $passwd.val();
@@ -201,6 +214,13 @@ define([
         };
         refreshSavedWallet();
         refreshSavePassword();
+        if (!legacyDisabled && (!walletFirst || forceLegacyLogin)) {
+            $uname.focus();
+        } else if (!$savedWallet.hasClass('cp-hidden')) {
+            $walletPassword.focus();
+        } else {
+            $walletMnemonic.focus();
+        }
         $saveWallet.on('change', refreshSavePassword);
         $('#pft-wallet-login').click(walletLogin);
         $('#pft-unlock-wallet').click(savedWalletLogin);
