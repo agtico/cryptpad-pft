@@ -113,6 +113,7 @@
     "test:postfiat": "node --test scripts/tests/postfiat-wallet-auth.test.js scripts/tests/postfiat-wallet-core.test.mjs scripts/tests/postfiat-local-store.test.js scripts/tests/postfiat-key-registry.test.mjs scripts/tests/postfiat-live-pad-share.test.mjs scripts/tests/postfiat-nostr-identity.test.mjs scripts/tests/postfiat-nostr-private-share.test.mjs scripts/tests/postfiat-nostr-relay-client.test.mjs scripts/tests/postfiat-private-share-workflow.test.mjs",
     "test-rpc": "cd scripts/tests && node test-rpc",
     "build:postfiat": "rollup -c rollup.postfiat.config.mjs",
+    "build:postfiat-share": "rollup -c rollup.postfiat-share.config.mjs",
     "evict-inactive": "node scripts/evict-inactive.js",
     "build": "node scripts/build.js",
     "clear": "node scripts/clear.js",
