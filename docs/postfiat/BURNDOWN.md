@@ -38,7 +38,7 @@ Status values:
 - [x] Use wallet address as the CryptPad username.
 - [x] Make wallet login idempotent: first use registers, later use logs in.
 - [ ] Decide migration behavior for old username/password users.
-- [ ] Add wallet-login UI for create/restore/unlock.
+- [~] Add wallet-login UI for create/restore/unlock.
 - [ ] Add server nonce session only where server authorization is needed.
 - [ ] Add e2e test: restore same 24-word seed in a new browser and recover same CryptPad drive.
 
@@ -115,8 +115,8 @@ Status values:
 
 ## Immediate Next Tasks
 
-1. Build the first wallet unlock/login screen.
-2. Connect the Task Node mnemonic wallet to `walletAuth` in the login UI.
-3. Add encrypted wallet-at-rest storage and session restore.
-4. Run a browser e2e test proving the same 24-word seed recovers the same CryptPad drive.
+1. Add encrypted wallet-at-rest storage and session restore.
+2. Add wallet creation/onboarding with a save-confirm step.
+3. Run a browser e2e test proving the same 24-word seed recovers the same CryptPad drive.
+4. Start the visual redesign of login/drive around the Post Fiat shell.
 5. Implement a minimal share-to-wallet bridge that encrypts a CryptPad URL secret as a PFTL v3 document.

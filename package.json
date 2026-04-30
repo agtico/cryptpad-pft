@@ -109,6 +109,7 @@
     "test": "node scripts/TestSelenium.js",
     "test:postfiat": "node --test scripts/tests/postfiat-wallet-auth.test.js scripts/tests/postfiat-wallet-core.test.mjs",
     "test-rpc": "cd scripts/tests && node test-rpc",
+    "build:postfiat": "rollup -c rollup.postfiat.config.mjs",
     "evict-inactive": "node scripts/evict-inactive.js",
     "build": "node scripts/build.js",
     "clear": "node scripts/clear.js",

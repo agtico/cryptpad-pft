@@ -65,6 +65,27 @@ define([
                             ),
                             h('button.login', Msg.login_login),
                         ]),
+                        h('div.cp-postfiat-wallet-login', [
+                            h('div.cp-login-instance', 'Post Fiat wallet'),
+                            h('div.big-container', [
+                                h('div.input-container', [
+                                    h('label.cp-default-label', { for: 'pft-mnemonic' }, '24-word seed phrase'),
+                                    h('textarea.form-control#pft-mnemonic', {
+                                        name: 'pft-mnemonic',
+                                        autocomplete: 'off',
+                                        autocorrect: 'off',
+                                        autocapitalize: 'off',
+                                        spellcheck: false,
+                                        rows: 3,
+                                    }),
+                                ]),
+                            ]),
+                            h('div.extra', [
+                                h('button#pft-wallet-login.btn.btn-primary', {
+                                    type: 'button',
+                                }, 'Log in with Post Fiat wallet'),
+                            ]),
+                        ]),
                     ]),
                     h('div.col-md-3'+ssoEnforced),
                     h('div.col-md-3'+ssoEnabled),

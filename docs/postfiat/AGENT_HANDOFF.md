@@ -21,6 +21,8 @@ Implemented so far:
 - `src/postfiat/wallet-core.mjs`: Task Node style 24-word BIP39 mnemonic, XRPL wallet derivation, and message signing/verification.
 - `src/common/postfiat-wallet-auth.js`: canonical Post Fiat login/access messages plus wallet-signature-to-CryptPad-entropy derivation.
 - `www/common/common-login.js`: accepts `walletAuth` without breaking stock password login, uses wallet-derived entropy, preserves wallet address casing, and makes wallet login idempotent.
+- `www/common/postfiat-wallet-core.bundle.js`: browser bundle for mnemonic derivation and message signing.
+- `customize.dist/pages/login.js` and `www/login/main.js`: minimal 24-word seed phrase login form wired into `walletAuth`.
 - `scripts/tests/postfiat-wallet-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, and PFT channel bytes.
 
 ## Do Not Re-Discover These First
@@ -39,8 +41,8 @@ Use these local repos as references:
 
 ## Recommended Implementation Order
 
-1. Create a wallet unlock/restore UI that calls `Login.loginOrRegister({ walletAuth })`.
-2. Add encrypted wallet-at-rest storage and session restore.
+1. Add encrypted wallet-at-rest storage and session restore.
+2. Add wallet creation/onboarding with a save-confirm step.
 3. Prove wallet login in a browser against a local CryptPad instance.
 4. Port PFTL key lookup/publication.
 5. Add share-to-wallet bridge for CryptPad URL secrets.

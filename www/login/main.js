@@ -13,9 +13,11 @@ define([
     '/common/common-feedback.js',
     '/common/outer/local-store.js',
     '/customize/messages.js',
+    '/common/postfiat-wallet-auth.js',
+    '/common/postfiat-wallet-core.bundle.js',
     //'/common/test.js',
 
-], function (Config, $, h, Cryptpad, Login, UI, Realtime, Feedback, LocalStore, Messages /*, Test */) {
+], function (Config, $, h, Cryptpad, Login, UI, Realtime, Feedback, LocalStore, Messages, WalletAuth /*, WalletCore, Test */) {
     if (window.top !== window) { return; }
     $(function () {
         var $checkImport = $('#import-recent');
@@ -100,6 +102,43 @@ define([
                 shouldImport,
                 onOTP: UI.getOTPScreen
             });
+        });
+
+        var $walletMnemonic = $('#pft-mnemonic');
+        var walletLogin = function () {
+            var Core = window.PostFiatWalletCore;
+            if (!Core) {
+                return void UI.warn('Post Fiat wallet code is unavailable.');
+            }
+
+            var mnemonic = $walletMnemonic.val();
+            var shouldImport = $checkImport[0].checked;
+            try {
+                var wallet = Core.deriveWalletFromMnemonic(mnemonic);
+                var message = WalletAuth.getLoginMessage(wallet.address);
+                var signed = Core.signMessage(mnemonic, message);
+
+                Login.loginOrRegisterUI({
+                    uname: wallet.address,
+                    passwd: '',
+                    shouldImport: shouldImport,
+                    walletAuth: {
+                        address: wallet.address,
+                        publicKey: signed.publicKey,
+                        signature: signed.signature,
+                        message: message,
+                    },
+                    onOTP: UI.getOTPScreen
+                });
+            } catch (err) {
+                console.error(err);
+                UI.warn('Invalid Post Fiat seed phrase.');
+            }
+        };
+        $('#pft-wallet-login').click(walletLogin);
+        $walletMnemonic.on('keydown', function (e) {
+            if (e.which !== 13 || !(e.ctrlKey || e.metaKey)) { return; }
+            walletLogin();
         });
         $('#register').on('click', function () {
             if ($uname.val()) {
