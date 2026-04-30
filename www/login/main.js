@@ -178,6 +178,9 @@ define([
 
             if (Core.createSessionWallet) {
                 await Core.createSessionWallet(wallet.mnemonic);
+                if (Core.startSessionWalletResponder) {
+                    Core.startSessionWalletResponder();
+                }
             }
             Login.loginOrRegisterUI({
                 uname: wallet.address,
@@ -219,6 +222,9 @@ define([
             await Core.saveWallet(savePassword, wallet.mnemonic);
             if (Core.createSessionWallet) {
                 await Core.createSessionWallet(wallet.mnemonic);
+                if (Core.startSessionWalletResponder) {
+                    Core.startSessionWalletResponder();
+                }
             }
             refreshSavedWallet();
             UI.log('Post Fiat wallet saved on this browser.');
@@ -307,6 +313,9 @@ define([
                 if (forceWalletVault && alreadyLoggedIn) {
                     if (Core.createSessionWallet) {
                         await Core.createSessionWallet(saved.mnemonic);
+                        if (Core.startSessionWalletResponder) {
+                            Core.startSessionWalletResponder();
+                        }
                     }
                     UI.log('Post Fiat wallet unlocked.');
                     redirectAfterVaultSetup();

@@ -22,7 +22,10 @@ import {
     normalizeMnemonic,
     saveWallet,
     restoreSessionWallet,
+    requestSessionWallet,
     signMessage,
+    startSessionWalletResponder,
+    stopSessionWalletResponder,
     unlockSavedWallet,
     verifyMessage,
 } from '../../src/postfiat/wallet-core.mjs';
@@ -52,6 +55,39 @@ const makeKeyStore = () => {
         delete: async () => {
             value = null;
         },
+    };
+};
+
+const makeBroadcastChannel = () => {
+    const channels = new Map();
+    return class MockBroadcastChannel {
+        constructor(name) {
+            this.name = name;
+            this.onmessage = null;
+            this.closed = false;
+            if (!channels.has(name)) { channels.set(name, new Set()); }
+            channels.get(name).add(this);
+        }
+
+        postMessage(data) {
+            const peers = channels.get(this.name) || new Set();
+            peers.forEach((peer) => {
+                if (peer === this || peer.closed || typeof(peer.onmessage) !== 'function') {
+                    return;
+                }
+                setTimeout(() => {
+                    if (!peer.closed && typeof(peer.onmessage) === 'function') {
+                        peer.onmessage({ data });
+                    }
+                });
+            });
+        }
+
+        close() {
+            this.closed = true;
+            const peers = channels.get(this.name);
+            if (peers) { peers.delete(this); }
+        }
     };
 };
 
@@ -160,4 +196,47 @@ test('stores an unlocked wallet in session-scoped encrypted storage', async () =
     await clearSessionWallet({ storage, keyStore });
     assert.equal(storage.getItem(SESSION_WALLET_STORAGE_KEY), null);
     assert.equal(await restoreSessionWallet({ storage, keyStore }), null);
+});
+
+test('imports an unlocked wallet session from another browser context', async () => {
+    const sourceStorage = makeStorage();
+    const sourceKeyStore = makeKeyStore();
+    const targetStorage = makeStorage();
+    const targetKeyStore = makeKeyStore();
+    const BroadcastChannelImpl = makeBroadcastChannel();
+
+    await createSessionWallet(TEST_MNEMONIC, {
+        storage: sourceStorage,
+        keyStore: sourceKeyStore,
+        BroadcastChannelImpl,
+        startResponder: false,
+    });
+    assert.equal(startSessionWalletResponder({
+        storage: sourceStorage,
+        keyStore: sourceKeyStore,
+        BroadcastChannelImpl,
+    }), true);
+
+    try {
+        const imported = await requestSessionWallet({
+            storage: targetStorage,
+            keyStore: targetKeyStore,
+            BroadcastChannelImpl,
+            timeoutMs: 100,
+            startResponder: false,
+        });
+
+        assert.equal(imported.mnemonic, TEST_MNEMONIC);
+        assert.equal(imported.wallet.address, TEST_ADDRESS);
+        assert.ok(targetStorage.getItem(SESSION_WALLET_STORAGE_KEY));
+
+        const restored = await restoreSessionWallet({
+            storage: targetStorage,
+            keyStore: targetKeyStore,
+        });
+        assert.equal(restored.mnemonic, TEST_MNEMONIC);
+        assert.equal(restored.wallet.address, TEST_ADDRESS);
+    } finally {
+        stopSessionWalletResponder();
+    }
 });

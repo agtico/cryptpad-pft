@@ -407,6 +407,9 @@ define([
             throw new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE');
         }
         var session = await Core.restoreSessionWallet();
+        if (!session && typeof(Core.requestSessionWallet) === 'function') {
+            session = await Core.requestSessionWallet({ timeoutMs: 1200 });
+        }
         if (!session || !session.mnemonic) {
             throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
         }
@@ -421,6 +424,14 @@ define([
         var savedContacts = [];
         var activePostFiatSession = null;
         var walletUnlockAttempt = 0;
+        try {
+            var WalletCore = getPostFiatWalletCore();
+            if (typeof(WalletCore.startSessionWalletResponder) === 'function') {
+                WalletCore.startSessionWalletResponder();
+            }
+        } catch (err) {
+            console.error(err);
+        }
 
         var savedWalletAddress = h('span.cp-share-pft-saved-wallet-address');
         var savedWalletPassword = h('input.form-control#cp-share-pft-saved-wallet-password', {
@@ -652,7 +663,11 @@ define([
             var Core = getPostFiatWalletCore();
             var session = rememberPostFiatSession(mnemonic);
             if (typeof(Core.createSessionWallet) === 'function') {
-                Core.createSessionWallet(session.mnemonic).catch(function (err) {
+                Core.createSessionWallet(session.mnemonic).then(function () {
+                    if (typeof(Core.startSessionWalletResponder) === 'function') {
+                        Core.startSessionWalletResponder();
+                    }
+                }).catch(function (err) {
                     console.error(err);
                 });
             }

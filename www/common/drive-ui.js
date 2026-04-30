@@ -68,6 +68,10 @@ define([
         isMac: navigator.platform === "MacIntel",
         allowFolderUpload: File.prototype.hasOwnProperty("webkitRelativePath"),
     };
+    if (window.PostFiatWalletCore &&
+            typeof(window.PostFiatWalletCore.startSessionWalletResponder) === 'function') {
+        window.PostFiatWalletCore.startSessionWalletResponder();
+    }
     var onConnectEvt = Util.mkEvent(true);
 
     var stringify = function (obj) {
@@ -3866,6 +3870,9 @@ define([
                 throw new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE');
             }
             var session = await Core.restoreSessionWallet();
+            if (!session && typeof(Core.requestSessionWallet) === 'function') {
+                session = await Core.requestSessionWallet({ timeoutMs: 1200 });
+            }
             if (!session || !session.mnemonic) {
                 throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
             }
