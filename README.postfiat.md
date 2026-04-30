@@ -29,6 +29,7 @@ The fork now includes the first Post Fiat wallet login path:
 - Minimal wallet login UI.
 - Optional encrypted saved-wallet unlock using PBKDF2-SHA256/AES-GCM.
 - Session-only wallet login capability storage so a wallet login does not leave a persistent CryptPad `Block_hash` in browser `localStorage`.
+- Nostr private sharing bridge for live CryptPad pads, including wallet inbox directory publish/fetch and share-by-wallet-address.
 
 Read these first:
 
@@ -41,4 +42,4 @@ Read these first:
 
 Do not make CryptPad contacts or raw share URLs the canonical Post Fiat access model.
 
-The fastest useful bridge is to encrypt CryptPad pad secrets/URLs as PFTL v3 payloads and send wallet-to-wallet pointer transactions. The longer-term target is PFTL v3 document storage: encrypted `ContentBlob`, replaceable `AccessManifest`, and XRPL `pf.ptr/v2` pointer memos.
+The default private collaboration bridge is encrypted Nostr relay delivery of live CryptPad pad capabilities between PFT wallet-derived inboxes. PFTL/IPFS should be an explicit durable publication/export path with privacy warnings, not the silent default for normal sharing.

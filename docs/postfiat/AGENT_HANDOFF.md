@@ -34,6 +34,7 @@ Implemented so far:
 - `src/postfiat/nostr-private-share.mjs`: NIP-44 v2 encryption/decryption, NIP-01 event signing/verification, and NIP-59-style seal/gift-wrap helpers for private live-pad shares.
 - `src/postfiat/nostr-relay-client.mjs`: relay WebSocket helpers for publishing gift wraps and fetching recipient inbox gift wraps.
 - `src/postfiat/private-share-workflow.mjs`: UI-ready workflow that derives sender/recipient Nostr identity from PFT mnemonics, selects recipient/config relays, accepts full recipient directory records or raw recipient Nostr pubkeys, publishes private live-pad shares, and opens fetched shares.
+- `src/postfiat/private-share-workflow.mjs`: public Nostr wallet-directory publish/fetch for resolving a PFT wallet address to its private-share inbox key and relay set.
 - `www/common/postfiat-private-share.bundle.js`: browser IIFE bundle exposing the private-share workflow as `window.PostFiatPrivateShare`.
 - `www/common/postfiat-private-share-contacts.js`: encrypted-account saved recipients for private-share contacts.
 - `www/common/inner/share.js`: Post Fiat is now the primary share tab when `postFiat` config is present; it copies the current wallet inbox JSON and publishes live-pad gift wraps to relay(s).
@@ -66,7 +67,7 @@ Use these local repos as references:
 
 1. Add browser e2e coverage for wallet-first login, seed login, saved-wallet unlock, session lock, and drive recovery.
 2. Add browser-level integration tests against a local or fake Nostr relay, including the share-modal tab and Drive inbox.
-3. Add wallet/contact directory discovery so first exchange does not require raw pubkeys or inbox JSON.
+3. Add browser e2e coverage for wallet-directory publish/fetch and share-by-wallet-address.
 4. Improve the first-pass Post Fiat share/inbox UI styling and mobile layout.
 5. Keep PFTL/IPFS durable publishing behind explicit UX and privacy warnings.
 

@@ -76,6 +76,125 @@ export const buildRelayReqMessage = ({ subscriptionId, filters } = {}) => [
     ...(Array.isArray(filters) ? filters : [filters]),
 ];
 
+export const fetchNostrEventsFromRelay = ({
+    relayUrl,
+    filters,
+    WebSocketImpl,
+    subscriptionId,
+    timeoutMs,
+} = {}) => new Promise((resolve, reject) => {
+    const url = normalizeNostrRelayUrl(relayUrl);
+    const subId = normalizeSubscriptionId(subscriptionId);
+    const normalizedFilters = Array.isArray(filters) ? filters : [filters];
+    if (!normalizedFilters.length || normalizedFilters.some((filter) =>
+        !filter || typeof filter !== 'object')) {
+        reject(new Error('INVALID_NOSTR_FILTERS'));
+        return;
+    }
+    const Socket = getWebSocketImpl(WebSocketImpl);
+    const socket = new Socket(url);
+    const events = [];
+    let settled = false;
+    let timer;
+
+    function closeSocket() {
+        try {
+            socket.send(JSON.stringify(buildRelayCloseMessage(subId)));
+        } catch (err) {}
+        try {
+            socket.close();
+        } catch (err) {}
+    }
+    function finish(err, value) {
+        if (settled) { return; }
+        settled = true;
+        clearTimeout(timer);
+        closeSocket();
+        if (err) {
+            reject(err);
+        } else {
+            resolve(value);
+        }
+    }
+    timer = setTimeout(() => {
+        finish(new Error('NOSTR_RELAY_FETCH_TIMEOUT'));
+    }, normalizeTimeout(timeoutMs));
+
+    socket.onerror = () => finish(new Error('NOSTR_RELAY_CONNECTION_ERROR'));
+    socket.onopen = () => {
+        socket.send(JSON.stringify(buildRelayReqMessage({
+            subscriptionId: subId,
+            filters: normalizedFilters,
+        })));
+    };
+    socket.onmessage = (message) => {
+        let data;
+        try {
+            data = parseRelayMessage(message.data);
+        } catch (err) {
+            finish(err);
+            return;
+        }
+        if (data[0] === 'EVENT' && data[1] === subId) {
+            const event = data[2];
+            if (event && verifyNostrEvent(event)) {
+                events.push(event);
+            }
+            return;
+        }
+        if (data[0] === 'EOSE' && data[1] === subId) {
+            finish(null, {
+                relayUrl: url,
+                events,
+            });
+        }
+    };
+});
+
+export const fetchNostrEventsFromRelays = async ({
+    relayUrls,
+    filters,
+    WebSocketImpl,
+    subscriptionId,
+    timeoutMs,
+} = {}) => {
+    const urls = Array.from(new Set((relayUrls || []).map(normalizeNostrRelayUrl)));
+    if (!urls.length) {
+        throw new Error('MISSING_NOSTR_RELAYS');
+    }
+    const results = await Promise.all(urls.map(async (relayUrl) => {
+        try {
+            return await fetchNostrEventsFromRelay({
+                relayUrl,
+                filters,
+                WebSocketImpl,
+                subscriptionId,
+                timeoutMs,
+            });
+        } catch (err) {
+            return {
+                relayUrl,
+                events: [],
+                error: err.message || String(err),
+            };
+        }
+    }));
+    const seen = new Set();
+    const events = [];
+    results.forEach((result) => {
+        result.events.forEach((event) => {
+            if (!seen.has(event.id)) {
+                seen.add(event.id);
+                events.push(event);
+            }
+        });
+    });
+    return {
+        results,
+        events,
+    };
+};
+
 export const buildGiftWrapInboxFilter = ({
     recipientPublicKeyHex,
     since,
@@ -194,74 +313,25 @@ export const fetchGiftWrapsFromRelay = ({
     until,
     limit,
     timeoutMs,
-} = {}) => new Promise((resolve, reject) => {
+} = {}) => {
     const url = normalizeNostrRelayUrl(relayUrl);
-    const subId = normalizeSubscriptionId(subscriptionId);
     const filter = buildGiftWrapInboxFilter({
         recipientPublicKeyHex,
         since,
         until,
         limit,
     });
-    const Socket = getWebSocketImpl(WebSocketImpl);
-    const socket = new Socket(url);
-    const events = [];
-    let settled = false;
-    let timer;
-
-    function closeSocket() {
-        try {
-            socket.send(JSON.stringify(buildRelayCloseMessage(subId)));
-        } catch (err) {}
-        try {
-            socket.close();
-        } catch (err) {}
-    }
-    function finish(err, value) {
-        if (settled) { return; }
-        settled = true;
-        clearTimeout(timer);
-        closeSocket();
-        if (err) {
-            reject(err);
-        } else {
-            resolve(value);
-        }
-    }
-    timer = setTimeout(() => {
-        finish(new Error('NOSTR_RELAY_FETCH_TIMEOUT'));
-    }, normalizeTimeout(timeoutMs));
-
-    socket.onerror = () => finish(new Error('NOSTR_RELAY_CONNECTION_ERROR'));
-    socket.onopen = () => {
-        socket.send(JSON.stringify(buildRelayReqMessage({
-            subscriptionId: subId,
-            filters: [filter],
-        })));
-    };
-    socket.onmessage = (message) => {
-        let data;
-        try {
-            data = parseRelayMessage(message.data);
-        } catch (err) {
-            finish(err);
-            return;
-        }
-        if (data[0] === 'EVENT' && data[1] === subId) {
-            const event = data[2];
-            if (event?.kind === NOSTR_KIND_GIFT_WRAP && verifyNostrEvent(event)) {
-                events.push(event);
-            }
-            return;
-        }
-        if (data[0] === 'EOSE' && data[1] === subId) {
-            finish(null, {
-                relayUrl: url,
-                events,
-            });
-        }
-    };
-});
+    return fetchNostrEventsFromRelay({
+        relayUrl: url,
+        filters: [filter],
+        WebSocketImpl,
+        subscriptionId,
+        timeoutMs,
+    }).then((result) => ({
+        ...result,
+        events: result.events.filter((event) => event.kind === NOSTR_KIND_GIFT_WRAP),
+    }));
+};
 
 export const fetchGiftWrapsFromRelays = async ({
     relayUrls,
@@ -276,37 +346,22 @@ export const fetchGiftWrapsFromRelays = async ({
     if (!urls.length) {
         throw new Error('MISSING_NOSTR_RELAYS');
     }
-    const results = await Promise.all(urls.map(async (relayUrl) => {
-        try {
-            return await fetchGiftWrapsFromRelay({
-                relayUrl,
-                recipientPublicKeyHex,
-                WebSocketImpl,
-                since,
-                until,
-                limit,
-                timeoutMs,
-            });
-        } catch (err) {
-            return {
-                relayUrl,
-                events: [],
-                error: err.message || String(err),
-            };
-        }
-    }));
-    const seen = new Set();
-    const events = [];
-    results.forEach((result) => {
-        result.events.forEach((event) => {
-            if (!seen.has(event.id)) {
-                seen.add(event.id);
-                events.push(event);
-            }
-        });
+    const result = await fetchNostrEventsFromRelays({
+        relayUrls: urls,
+        filters: [buildGiftWrapInboxFilter({
+            recipientPublicKeyHex,
+            since,
+            until,
+            limit,
+        })],
+        WebSocketImpl,
+        timeoutMs,
     });
     return {
-        results,
-        events,
+        results: result.results.map((relayResult) => ({
+            ...relayResult,
+            events: relayResult.events.filter((event) => event.kind === NOSTR_KIND_GIFT_WRAP),
+        })),
+        events: result.events.filter((event) => event.kind === NOSTR_KIND_GIFT_WRAP),
     };
 };

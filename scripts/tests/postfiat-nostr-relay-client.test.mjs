@@ -12,6 +12,8 @@ import {
 } from '../../src/postfiat/nostr-private-share.mjs';
 import {
     buildGiftWrapInboxFilter,
+    fetchNostrEventsFromRelay,
+    fetchNostrEventsFromRelays,
     fetchGiftWrapsFromRelay,
     fetchGiftWrapsFromRelays,
     publishNostrEventToRelay,
@@ -147,6 +149,32 @@ test('fetches valid gift wraps from a relay inbox subscription', async () => {
     assert.equal(result.events[0].id, giftWrap.id);
     assert.equal(JSON.parse(sockets[0].sent[0])[0], 'REQ');
     assert.equal(JSON.parse(sockets[0].sent.at(-1))[0], 'CLOSE');
+});
+
+test('fetches and deduplicates generic signed Nostr events', async () => {
+    const giftWrap = makeGiftWrap();
+    const { FakeWebSocket, sockets } = createFakeWebSocket({ giftWrap });
+    const result = await fetchNostrEventsFromRelay({
+        relayUrl: 'wss://relay.postfiat.example/',
+        subscriptionId: 'generic',
+        filters: [{ kinds: [1059], limit: 10 }],
+        WebSocketImpl: FakeWebSocket,
+        timeoutMs: 100,
+    });
+
+    assert.equal(result.events.length, 1);
+    assert.equal(result.events[0].id, giftWrap.id);
+    assert.equal(JSON.parse(sockets[0].sent[0])[0], 'REQ');
+
+    const deduped = await fetchNostrEventsFromRelays({
+        relayUrls: ['wss://relay-a.example', 'wss://relay-b.example'],
+        filters: [{ kinds: [1059], limit: 10 }],
+        WebSocketImpl: FakeWebSocket,
+        timeoutMs: 100,
+    });
+
+    assert.equal(deduped.results.length, 2);
+    assert.equal(deduped.events.length, 1);
 });
 
 test('deduplicates gift wraps fetched from multiple relays', async () => {

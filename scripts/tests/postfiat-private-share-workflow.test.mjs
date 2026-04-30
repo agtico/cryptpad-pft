@@ -13,11 +13,17 @@ import {
 } from '../../src/postfiat/nostr-identity.mjs';
 import {
     buildLivePadPrivateShare,
+    buildNostrInboxDirectoryDTag,
     buildOwnNostrInboxDirectory,
+    buildSignedNostrInboxDirectoryEvent,
+    fetchNostrInboxDirectories,
     fetchAndOpenLivePadPrivateShares,
     normalizePrivateShareRecipient,
     openLivePadPrivateShare,
+    parseNostrInboxDirectoryEvent,
+    publishOwnNostrInboxDirectory,
     publishLivePadPrivateShare,
+    resolvePrivateShareRecipient,
     selectPrivateShareRelays,
 } from '../../src/postfiat/private-share-workflow.mjs';
 
@@ -37,7 +43,8 @@ const makeRecipientDirectory = async (relays = ['wss://recipient-relay.example']
     });
 };
 
-const createFakeWebSocket = ({ giftWrap } = {}) => {
+const createFakeWebSocket = ({ giftWrap, event, events } = {}) => {
+    const relayEvents = events || [giftWrap, event].filter(Boolean);
     const sockets = [];
     class FakeWebSocket {
         constructor(url) {
@@ -57,8 +64,10 @@ const createFakeWebSocket = ({ giftWrap } = {}) => {
             }
             if (parsed[0] === 'REQ') {
                 setTimeout(() => {
-                    this.onmessage && this.onmessage({
-                        data: JSON.stringify(['EVENT', parsed[1], giftWrap]),
+                    relayEvents.forEach((relayEvent) => {
+                        this.onmessage && this.onmessage({
+                            data: JSON.stringify(['EVENT', parsed[1], relayEvent]),
+                        });
                     });
                     this.onmessage && this.onmessage({
                         data: JSON.stringify(['EOSE', parsed[1]]),
@@ -72,6 +81,65 @@ const createFakeWebSocket = ({ giftWrap } = {}) => {
     }
     return { FakeWebSocket, sockets };
 };
+
+test('publishes and resolves wallet Nostr inbox directory events', async () => {
+    const builtDirectory = await buildSignedNostrInboxDirectoryEvent({
+        mnemonic: RECIPIENT_MNEMONIC,
+        relayUrls: ['wss://directory-relay.example/'],
+        origin: ORIGIN,
+        createdAt: '2026-04-30T00:00:00.000Z',
+        eventCreatedAt: 1777564800,
+    });
+
+    assert.equal(builtDirectory.directory.walletAddress, 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV');
+    assert.equal(
+        builtDirectory.event.tags[0][1],
+        buildNostrInboxDirectoryDTag('rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV')
+    );
+    assert.deepEqual(parseNostrInboxDirectoryEvent(builtDirectory.event).directory, builtDirectory.directory);
+
+    const { FakeWebSocket, sockets } = createFakeWebSocket({ event: builtDirectory.event });
+    const fetched = await fetchNostrInboxDirectories({
+        walletAddress: 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV',
+        relayUrls: ['wss://directory-relay.example/'],
+        WebSocketImpl: FakeWebSocket,
+        timeoutMs: 100,
+    });
+
+    assert.equal(fetched.directories.length, 1);
+    assert.deepEqual(fetched.directories[0].directory, builtDirectory.directory);
+    assert.deepEqual(JSON.parse(sockets[0].sent[0])[2], {
+        kinds: [30078],
+        '#d': [buildNostrInboxDirectoryDTag('rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV')],
+        limit: 10,
+    });
+
+    const resolved = await resolvePrivateShareRecipient(
+        'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV',
+        {
+            relayUrls: ['wss://directory-relay.example/'],
+            WebSocketImpl: FakeWebSocket,
+            timeoutMs: 100,
+        }
+    );
+    assert.deepEqual(resolved, builtDirectory.directory);
+});
+
+test('publishes own wallet directory to relays', async () => {
+    const { FakeWebSocket } = createFakeWebSocket();
+    const published = await publishOwnNostrInboxDirectory({
+        mnemonic: RECIPIENT_MNEMONIC,
+        relayUrls: ['wss://directory-relay.example/'],
+        origin: ORIGIN,
+        createdAt: '2026-04-30T00:00:00.000Z',
+        eventCreatedAt: 1777564800,
+        WebSocketImpl: FakeWebSocket,
+        timeoutMs: 100,
+    });
+
+    assert.equal(published.publishResults[0].accepted, true);
+    assert.equal(published.directory.walletAddress, 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV');
+});
 
 test('selects recipient relays before instance relay fallbacks', async () => {
     const directory = await makeRecipientDirectory(['wss://recipient.example/']);
@@ -179,6 +247,40 @@ test('builds and opens a live-pad private share from PFT wallet mnemonics', asyn
     assert.equal(opened.recipient.walletAddress, 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV');
     assert.equal(opened.payload.href, '/pad/#/2/pad/edit/example/');
     assert.equal(opened.payload.title, 'Strategy note');
+});
+
+test('builds a private share by resolving a wallet address through directory relays', async () => {
+    const builtDirectory = await buildSignedNostrInboxDirectoryEvent({
+        mnemonic: RECIPIENT_MNEMONIC,
+        relayUrls: ['wss://directory-relay.example/'],
+        origin: ORIGIN,
+        createdAt: '2026-04-30T00:00:00.000Z',
+        eventCreatedAt: 1777564800,
+    });
+    const { FakeWebSocket } = createFakeWebSocket({ event: builtDirectory.event });
+
+    const built = await buildLivePadPrivateShare({
+        senderMnemonic: SENDER_MNEMONIC,
+        recipientDirectory: 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV',
+        directoryRelays: ['wss://directory-relay.example/'],
+        origin: ORIGIN,
+        href: '/pad/#/2/pad/edit/example/',
+        title: 'Wallet address share',
+        mode: 'edit',
+        currentTime: 1777564800,
+        rumorCreatedAt: 1777564800,
+        sealCreatedAt: 1777564700,
+        wrapCreatedAt: 1777564600,
+        sealNonce: hexToBytes('bb'.repeat(32)),
+        wrapNonce: hexToBytes('cc'.repeat(32)),
+        wrapperPrivateKeyHex: '0000000000000000000000000000000000000000000000000000000000000003',
+        WebSocketImpl: FakeWebSocket,
+        timeoutMs: 100,
+    });
+
+    assert.equal(built.recipient.walletAddress, 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV');
+    assert.equal(built.recipient.publicKeyHex, builtDirectory.directory.publicKeyHex);
+    assert.equal(built.payload.title, 'Wallet address share');
 });
 
 test('publishes and fetches live-pad private shares through relay helpers', async () => {

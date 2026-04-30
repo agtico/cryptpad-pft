@@ -71,6 +71,7 @@ Status values:
 - [x] Add UI-ready workflow helpers that publish and open live-pad private shares from PFT wallet mnemonics.
 - [x] Bundle the private-share workflow for browser use.
 - [x] Let the browser share workflow accept a recipient Nostr pubkey plus relay list before full wallet-directory discovery exists.
+- [x] Add Nostr relay wallet-directory publish/fetch so first exchange can target a PFT wallet address without raw pubkey or inbox JSON paste.
 - [~] Add encrypted-account saved recipients so users can reuse private-share contacts after first exchange.
 - [ ] Add peer chat/replies around shared documents using the same encrypted relay channel.
 - [ ] Keep raw CryptPad link copy available as an advanced/legacy action.
@@ -139,6 +140,6 @@ Status values:
 
 1. Add browser e2e tests for wallet-first login, saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery.
 2. Add browser-level integration tests against a local or fake Nostr relay for share publish, inbox refresh, open, and save.
-3. Add wallet/contact directory discovery so first exchange does not require raw pubkey or inbox JSON paste.
+3. Add browser e2e coverage for wallet-directory publish/fetch and share-by-wallet-address.
 4. Improve the first-pass Post Fiat share/inbox UI styling and mobile layout.
 5. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.

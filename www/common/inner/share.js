@@ -378,10 +378,36 @@ define([
             .filter(Boolean);
     };
 
-    var parsePostFiatRecipientInput = function (value, relays) {
+    var isPostFiatWalletAddress = function (value) {
+        return /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/u.test(String(value || '').trim());
+    };
+
+    var findSavedPostFiatRecipient = function (value, contacts) {
+        var text = String(value || '').trim().toLowerCase();
+        if (!text) { return; }
+        for (var i = 0; i < contacts.length; i += 1) {
+            var contact = contacts[i];
+            var candidates = [
+                contact.walletAddress,
+                contact.label,
+                contact.publicKeyHex,
+                contact.id
+            ].filter(Boolean).map(function (candidate) {
+                return String(candidate).trim().toLowerCase();
+            });
+            if (candidates.indexOf(text) !== -1) {
+                return PostFiatContacts.toRecipient(contact);
+            }
+        }
+    };
+
+    var parsePostFiatRecipientInput = function (value, relays, contacts) {
         var text = String(value || '').trim();
         if (!text) { throw new Error('MISSING_POSTFIAT_RECIPIENT'); }
-        var recipient = text[0] === '{' ? JSON.parse(text) : { publicKeyHex: text };
+        var savedRecipient = findSavedPostFiatRecipient(text, contacts || []);
+        var recipient = savedRecipient || (text[0] === '{' ?
+            JSON.parse(text) : isPostFiatWalletAddress(text) ?
+                { walletAddress: text } : { publicKeyHex: text });
         if (!Array.isArray(recipient.relays) || !recipient.relays.length) {
             recipient.relays = relays;
         }
@@ -485,7 +511,7 @@ define([
         var recipientInput = h('textarea.form-control#cp-share-pft-recipient', {
             rows: 4,
             spellcheck: false,
-            placeholder: 'Recipient Nostr pubkey or inbox JSON'
+            placeholder: 'Wallet address, saved contact, Nostr pubkey, or inbox JSON'
         });
         var relaysInput = h('textarea.form-control#cp-share-pft-relays', {
             rows: 2,
@@ -772,6 +798,53 @@ define([
                     },
                     keys: []
                 }, {
+                    className: 'secondary cp-share-pft-publish-inbox',
+                    name: 'Publish inbox',
+                    iconClass: 'upload',
+                    onClick: function () {
+                        if (!ShareWorkflow ||
+                                typeof(ShareWorkflow.publishOwnNostrInboxDirectory) !== 'function') {
+                            UI.warn('Post Fiat private sharing code is unavailable.');
+                            return true;
+                        }
+                        var $button = $('.alertify').find('button.cp-share-pft-publish-inbox');
+                        var relayList = parsePostFiatRelayInput($(relaysInput).val());
+                        $button.attr('disabled', 'disabled');
+                        setStatus('Publishing inbox...');
+                        getCurrentPostFiatSessionWallet().then(function (session) {
+                            return ShareWorkflow.publishOwnNostrInboxDirectory({
+                                mnemonic: session.mnemonic,
+                                postFiatConfig: ApiConfig.postFiat,
+                                fallbackRelays: relayList,
+                                relayUrls: relayList,
+                                origin: opts.origin || window.location.origin,
+                                timeoutMs: 10000
+                            });
+                        }).then(function (published) {
+                            var accepted = published.publishResults.filter(function (r) {
+                                return r.accepted;
+                            }).length;
+                            $(ownDirectory).val(JSON.stringify(published.directory, null, 2));
+                            setWalletUnlocked(published.directory.walletAddress);
+                            setStatus(accepted ?
+                                'Published inbox to ' + accepted + ' relay(s).' :
+                                'No relay accepted the inbox directory.', !accepted);
+                            if (accepted) { UI.log(Messages.shareSuccess); }
+                            else { UI.warn('No relay accepted the Post Fiat inbox directory.'); }
+                        }).catch(function (err) {
+                            if (err && err.message === 'POSTFIAT_WALLET_SESSION_REQUIRED') {
+                                requireWalletUnlock('Unlock wallet here before publishing your inbox.');
+                                return;
+                            }
+                            setStatus(err.message || String(err), true);
+                            UI.warn('Unable to publish Post Fiat inbox.');
+                        }).finally(function () {
+                            $button.removeAttr('disabled');
+                        });
+                        return true;
+                    },
+                    keys: []
+                }, {
                     className: 'primary cp-nobar cp-share-pft-publish',
                     name: 'Share to wallet',
                     iconClass: 'share',
@@ -791,12 +864,17 @@ define([
                         $button.attr('disabled', 'disabled');
                         setStatus('Publishing...');
                         getCurrentPostFiatSessionWallet().then(function (session) {
-                            var recipient = parsePostFiatRecipientInput($(recipientInput).val(), relayList);
+                            var recipient = parsePostFiatRecipientInput(
+                                $(recipientInput).val(),
+                                relayList,
+                                savedContacts
+                            );
                             return ShareWorkflow.publishLivePadPrivateShare({
                                 senderMnemonic: session.mnemonic,
                                 recipientDirectory: recipient,
                                 postFiatConfig: ApiConfig.postFiat,
                                 fallbackRelays: relayList,
+                                directoryRelays: relayList,
                                 origin: opts.origin || window.location.origin,
                                 href: href,
                                 title: opts.title || data.title || document.title,
