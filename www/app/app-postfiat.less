@@ -526,6 +526,22 @@ body.cp-app-postfiat {
     gap: 14px;
 }
 
+.pft-wide-panel {
+    grid-column: 1 / -1;
+}
+
+.pft-panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.pft-panel-heading h2 {
+    margin: 0;
+}
+
 .pft-setting-row {
     display: flex;
     justify-content: space-between;
@@ -538,6 +554,31 @@ body.cp-app-postfiat {
     overflow: hidden;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     text-overflow: ellipsis;
+}
+
+.pft-inbox-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    margin: 12px 0;
+    padding: 9px 10px;
+    border: 1px solid #dce3e4;
+    border-radius: 8px;
+    background: #f5f7f8;
+    color: #425049;
+    font-size: 13px;
+}
+
+.pft-inbox-status.pft-ok {
+    border-color: #b7d94a;
+    background: #f6ffd7;
+    color: #17201c;
+}
+
+.pft-inbox-status.pft-warn {
+    border-color: #e5cf98;
+    background: #fff9e8;
 }
 
 .pft-warning-panel {

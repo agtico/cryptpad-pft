@@ -33,6 +33,7 @@ define([
         wallet: null,
         walletSession: null,
         walletStatus: 'Checking',
+        inboxDirectory: null,
         shareDoc: null,
         shareStatus: '',
         inboxStatus: '',
@@ -66,6 +67,11 @@ define([
 
     var isWalletAddress = function (value) {
         return /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/u.test(String(value || '').trim());
+    };
+
+    var shortText = function (value) {
+        var text = String(value || '');
+        return text.length > 18 ? text.slice(0, 8) + '...' + text.slice(-6) : text;
     };
 
     var icon = function (name) {
@@ -523,8 +529,9 @@ define([
                 origin: common.getMetadataMgr().getPrivateData().origin || window.location.origin
             });
         }).then(function (directory) {
+            APP.inboxDirectory = directory;
             copyText(JSON.stringify(directory, null, 2), 'Inbox copied.');
-            APP.settingsStatus = 'Inbox copied.';
+            APP.settingsStatus = 'Inbox JSON copied for ' + directory.walletAddress + '.';
             render();
         }).catch(function (err) {
             console.error(err);
@@ -561,8 +568,11 @@ define([
             var accepted = published.publishResults.filter(function (r) {
                 return r.accepted;
             }).length;
+            APP.inboxDirectory = published.directory;
             APP.settingsStatus = accepted ?
-                'Published to ' + accepted + ' relay(s).' : 'No relay accepted the inbox.';
+                'Sharing inbox published for ' + published.directory.walletAddress +
+                    ' on ' + accepted + ' relay(s).' :
+                'No relay accepted the inbox.';
             render();
         }).catch(function (err) {
             console.error(err);
@@ -581,7 +591,7 @@ define([
         var metadataMgr = common && common.getMetadataMgr();
         var user = metadataMgr ? metadataMgr.getUserData() : {};
         var account = APP.wallet && APP.wallet.address || user.name || 'Wallet';
-        var shortAccount = account.length > 18 ? account.slice(0, 8) + '...' + account.slice(-6) : account;
+        var shortAccount = shortText(account);
         var nav = Object.keys(routeLabels).map(function (route) {
             var active = APP.route === route;
             var icons = {
@@ -849,6 +859,13 @@ define([
     };
 
     var renderSettings = function () {
+        var walletAddress = APP.wallet && APP.wallet.address || '';
+        var directory = APP.inboxDirectory;
+        var inboxReady = Boolean(directory && directory.walletAddress);
+        var inboxStatus = APP.settingsStatus || (walletAddress ?
+            (inboxReady ? 'Ready for wallet shares.' : 'Sharing inbox not published.') :
+            'Wallet locked.');
+        var inboxStatusClass = inboxReady ? '.pft-ok' : (walletAddress ? '.pft-warn' : '');
         var relays = h('textarea.pft-textarea#pft-settings-relays', {
             rows: 3,
             spellcheck: false
@@ -865,23 +882,39 @@ define([
             h('div.pft-view-header', [
                 h('div', [
                     h('h1', 'Settings'),
-                    h('div.pft-view-meta', APP.settingsStatus || 'Wallet and relay state')
+                    h('div.pft-view-meta', 'Wallet and relay state')
                 ])
             ]),
             h('div.pft-settings-grid', [
+                h('section.pft-panel.pft-wide-panel', [
+                    h('div.pft-panel-heading', [
+                        h('h2', 'Sharing inbox'),
+                        h('span.pft-pill', inboxReady ? 'Published' : 'Not published')
+                    ]),
+                    h('div.pft-setting-row', [
+                        h('span', 'Share address'),
+                        h('span.pft-mono', walletAddress || 'Locked')
+                    ]),
+                    h('div.pft-setting-row', [
+                        h('span', 'Directory key'),
+                        h('span.pft-mono', directory && directory.publicKeyHex ?
+                            shortText(directory.publicKeyHex) : 'Not published')
+                    ]),
+                    h('label.pft-label', { for: 'pft-settings-relays' }, 'Private relay list'),
+                    relays,
+                    h('div.pft-inbox-status' + inboxStatusClass, [
+                        h('span.pft-wallet-dot' + (inboxReady ? '.pft-ok' : '')),
+                        h('span', inboxStatus)
+                    ]),
+                    h('div.pft-actions-row', [publishInbox, copyInbox])
+                ]),
                 h('section.pft-panel', [
                     h('h2', 'Wallet'),
                     h('div.pft-setting-row', [
                         h('span', 'Address'),
-                        h('span.pft-mono', APP.wallet && APP.wallet.address || 'Locked')
+                        h('span.pft-mono', walletAddress || 'Locked')
                     ]),
                     h('div.pft-actions-row', [loginVault])
-                ]),
-                h('section.pft-panel', [
-                    h('h2', 'Relays'),
-                    h('label.pft-label', { for: 'pft-settings-relays' }, 'Private relay list'),
-                    relays,
-                    h('div.pft-actions-row', [copyInbox, publishInbox])
                 ])
             ])
         ]);
