@@ -31,6 +31,7 @@ define([
         inbox: [],
         sent: [],
         wallet: null,
+        walletSession: null,
         walletStatus: 'Checking',
         shareDoc: null,
         shareStatus: '',
@@ -143,23 +144,41 @@ define([
         });
     };
 
+    var setUnlockedWalletSession = function (session) {
+        var Core = getWalletCore();
+        if (!session || !session.mnemonic) {
+            throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
+        }
+        if (!session.wallet) {
+            session.wallet = Core.deriveWalletFromMnemonic(session.mnemonic);
+        }
+        APP.wallet = session.wallet;
+        APP.walletSession = session;
+        APP.walletStatus = 'Unlocked';
+        return session;
+    };
+
     var getSessionWallet = function () {
         var Core = getWalletCore();
+        if (APP.walletSession && APP.walletSession.mnemonic) {
+            return Promise.resolve(APP.walletSession);
+        }
         return Promise.resolve().then(function () {
             return Core.restoreSessionWallet();
+        }).catch(function (err) {
+            console.error(err);
+            return null;
         }).then(function (session) {
             if (session || typeof(Core.requestSessionWallet) !== 'function') { return session; }
             return Core.requestSessionWallet({ timeoutMs: 1200 });
+        }).catch(function (err) {
+            console.error(err);
+            return null;
         }).then(function (session) {
             if (session) { return session; }
             return requestOuterWalletSession();
         }).then(function (session) {
-            if (!session || !session.mnemonic) {
-                throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
-            }
-            APP.wallet = session.wallet;
-            APP.walletStatus = 'Unlocked';
-            return session;
+            return setUnlockedWalletSession(session);
         });
     };
 
@@ -194,6 +213,7 @@ define([
             console.error(err);
         }).then(function () {
             APP.wallet = null;
+            APP.walletSession = null;
             APP.walletStatus = 'Locked';
             APP.settingsStatus = 'Wallet locked.';
             UI.log('Post Fiat wallet locked.');
@@ -207,8 +227,26 @@ define([
 
     var handleWalletSessionRequired = function (message) {
         APP.wallet = null;
+        APP.walletSession = null;
         APP.walletStatus = 'Locked';
         UI.warn(message || 'Unlock your Post Fiat wallet first.');
+    };
+
+    var getShareErrorMessage = function (err) {
+        var code = err && err.message;
+        if (code === 'POSTFIAT_RECIPIENT_DIRECTORY_NOT_FOUND') {
+            return 'Recipient wallet has not published a sharing inbox yet.';
+        }
+        if (code === 'MISSING_NOSTR_RELAYS') {
+            return 'Add at least one relay before sending.';
+        }
+        if (code === 'MISSING_POSTFIAT_RECIPIENT') {
+            return 'Enter a recipient wallet address or inbox.';
+        }
+        if (code === 'INVALID_POSTFIAT_RECIPIENT') {
+            return 'Recipient is not a valid wallet address or inbox.';
+        }
+        return code || 'Unable to send share.';
     };
 
     var getUsableHref = function (value) {
@@ -401,9 +439,9 @@ define([
                 render();
                 return;
             }
-            APP.shareStatus = err.message || 'Unable to send share.';
+            APP.shareStatus = getShareErrorMessage(err);
             render();
-            UI.warn('Unable to send Post Fiat share.');
+            UI.warn(APP.shareStatus);
         });
     };
 
@@ -982,6 +1020,7 @@ define([
             getSessionWallet().catch(function (err) {
                 console.error(err);
                 APP.wallet = null;
+                APP.walletSession = null;
                 APP.walletStatus = 'Locked';
             })
         ]).then(render).catch(function (err) {
