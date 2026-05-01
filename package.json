@@ -110,7 +110,7 @@
     "lint:translations": "node ./scripts/translations/lint-translations.js",
     "unused-translations": "node ./scripts/translations/unused-translations.js",
     "test": "node scripts/TestSelenium.js",
-    "test:postfiat": "node --test scripts/tests/postfiat-wallet-auth.test.js scripts/tests/postfiat-wallet-core.test.mjs scripts/tests/postfiat-local-store.test.js scripts/tests/postfiat-key-registry.test.mjs scripts/tests/postfiat-live-pad-share.test.mjs scripts/tests/postfiat-nostr-identity.test.mjs scripts/tests/postfiat-nostr-private-share.test.mjs scripts/tests/postfiat-nostr-relay-client.test.mjs scripts/tests/postfiat-private-share-workflow.test.mjs scripts/tests/postfiat-private-share-contacts.test.js",
+    "test:postfiat": "node --test scripts/tests/postfiat-wallet-auth.test.js scripts/tests/postfiat-wallet-core.test.mjs scripts/tests/postfiat-local-store.test.js scripts/tests/postfiat-key-registry.test.mjs scripts/tests/postfiat-live-pad-share.test.mjs scripts/tests/postfiat-nostr-identity.test.mjs scripts/tests/postfiat-nostr-private-share.test.mjs scripts/tests/postfiat-nostr-relay-client.test.mjs scripts/tests/postfiat-private-share-workflow.test.mjs scripts/tests/postfiat-private-share-contacts.test.js scripts/tests/postfiat-csp.test.js",
     "test-rpc": "cd scripts/tests && node test-rpc",
     "build:postfiat": "rollup -c rollup.postfiat.config.mjs",
     "build:postfiat-share": "rollup -c rollup.postfiat-share.config.mjs",

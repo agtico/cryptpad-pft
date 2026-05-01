@@ -34,6 +34,9 @@ define([
         walletSession: null,
         walletStatus: 'Checking',
         inboxDirectory: null,
+        inboxDirectoryState: 'idle',
+        inboxPublishedRelays: [],
+        inboxPublishFailures: [],
         shareDoc: null,
         shareStatus: '',
         inboxStatus: '',
@@ -220,6 +223,7 @@ define([
         }).then(function () {
             APP.wallet = null;
             APP.walletSession = null;
+            clearInboxDirectoryState();
             APP.walletStatus = 'Locked';
             APP.settingsStatus = 'Wallet locked.';
             UI.log('Post Fiat wallet locked.');
@@ -234,6 +238,7 @@ define([
     var handleWalletSessionRequired = function (message) {
         APP.wallet = null;
         APP.walletSession = null;
+        clearInboxDirectoryState();
         APP.walletStatus = 'Locked';
         UI.warn(message || 'Unlock your Post Fiat wallet first.');
     };
@@ -253,6 +258,17 @@ define([
             return 'Recipient is not a valid wallet address or inbox.';
         }
         return code || 'Unable to send share.';
+    };
+
+    var clearInboxDirectoryState = function () {
+        APP.inboxDirectory = null;
+        APP.inboxDirectoryState = 'idle';
+        APP.inboxPublishedRelays = [];
+        APP.inboxPublishFailures = [];
+    };
+
+    var getRelayFailureMessage = function (result) {
+        return result.relayUrl + ': ' + (result.message || 'Connection failed');
     };
 
     var getUsableHref = function (value) {
@@ -530,8 +546,11 @@ define([
             });
         }).then(function (directory) {
             APP.inboxDirectory = directory;
+            APP.inboxDirectoryState = 'copied';
+            APP.inboxPublishedRelays = [];
+            APP.inboxPublishFailures = [];
             copyText(JSON.stringify(directory, null, 2), 'Inbox copied.');
-            APP.settingsStatus = 'Inbox JSON copied for ' + directory.walletAddress + '.';
+            APP.settingsStatus = 'Inbox JSON copied. Wallet-address sharing still needs a published inbox.';
             render();
         }).catch(function (err) {
             console.error(err);
@@ -553,6 +572,9 @@ define([
             return;
         }
         var relayList = parseRelayInput($('#pft-settings-relays').val() || getPostFiatRelays().join('\n'));
+        APP.inboxDirectoryState = 'publishing';
+        APP.inboxPublishedRelays = [];
+        APP.inboxPublishFailures = [];
         APP.settingsStatus = 'Publishing inbox...';
         render();
         getSessionWallet().then(function (session) {
@@ -565,14 +587,25 @@ define([
                 timeoutMs: 10000
             });
         }).then(function (published) {
-            var accepted = published.publishResults.filter(function (r) {
+            var acceptedResults = published.publishResults.filter(function (r) {
                 return r.accepted;
-            }).length;
+            });
+            var rejectedResults = published.publishResults.filter(function (r) {
+                return !r.accepted;
+            });
+            var accepted = acceptedResults.length;
             APP.inboxDirectory = published.directory;
-            APP.settingsStatus = accepted ?
-                'Sharing inbox published for ' + published.directory.walletAddress +
-                    ' on ' + accepted + ' relay(s).' :
-                'No relay accepted the inbox.';
+            APP.inboxPublishedRelays = acceptedResults.map(function (r) { return r.relayUrl; });
+            APP.inboxPublishFailures = rejectedResults;
+            APP.inboxDirectoryState = accepted ? 'published' : 'failed';
+            if (accepted) {
+                APP.settingsStatus = 'Sharing inbox published for ' + published.directory.walletAddress +
+                    ' on ' + accepted + ' relay(s).';
+                UI.log(APP.settingsStatus);
+            } else {
+                APP.settingsStatus = 'Inbox was not published. No relay accepted it.';
+                UI.warn(APP.settingsStatus);
+            }
             render();
         }).catch(function (err) {
             console.error(err);
@@ -861,16 +894,26 @@ define([
     var renderSettings = function () {
         var walletAddress = APP.wallet && APP.wallet.address || '';
         var directory = APP.inboxDirectory;
-        var inboxReady = Boolean(directory && directory.walletAddress);
+        var inboxReady = APP.inboxDirectoryState === 'published' &&
+            APP.inboxPublishedRelays.length > 0;
+        var inboxFailed = APP.inboxDirectoryState === 'failed';
+        var inboxCopied = APP.inboxDirectoryState === 'copied';
+        var inboxPublishing = APP.inboxDirectoryState === 'publishing';
         var inboxStatus = APP.settingsStatus || (walletAddress ?
             (inboxReady ? 'Ready for wallet shares.' : 'Sharing inbox not published.') :
             'Wallet locked.');
-        var inboxStatusClass = inboxReady ? '.pft-ok' : (walletAddress ? '.pft-warn' : '');
+        var inboxStatusClass = inboxReady ? '.pft-ok' : (inboxFailed ? '.pft-error' :
+            (walletAddress ? '.pft-warn' : ''));
+        var inboxDotClass = inboxReady ? '.pft-ok' : (inboxFailed ? '.pft-error' : '');
+        var pillClass = inboxReady ? '.pft-ok' : (inboxFailed ? '.pft-error' : '.pft-warn');
+        var pillText = inboxReady ? 'Published' : (inboxFailed ? 'Publish failed' :
+            (inboxPublishing ? 'Publishing' : (inboxCopied ? 'Copied' : 'Not published')));
+        var relayFailures = APP.inboxPublishFailures.map(getRelayFailureMessage);
         var relays = h('textarea.pft-textarea#pft-settings-relays', {
             rows: 3,
             spellcheck: false
         }, getPostFiatRelays().join('\n'));
-        var copyInbox = button('pft-secondary-button', 'Copy inbox', 'copy');
+        var copyInbox = button('pft-secondary-button', 'Copy inbox JSON', 'copy');
         var publishInbox = button('pft-primary-button', 'Publish inbox', 'upload');
         var loginVault = button('pft-secondary-button', APP.wallet ? 'Wallet vault' : 'Unlock wallet', 'login');
         $(copyInbox).on('click', copyInboxDirectory);
@@ -889,32 +932,33 @@ define([
                 h('section.pft-panel.pft-wide-panel', [
                     h('div.pft-panel-heading', [
                         h('h2', 'Sharing inbox'),
-                        h('span.pft-pill', inboxReady ? 'Published' : 'Not published')
+                        h('span.pft-pill' + pillClass, pillText)
                     ]),
-                    h('div.pft-setting-row', [
-                        h('span', 'Share address'),
-                        h('span.pft-mono', walletAddress || 'Locked')
-                    ]),
-                    h('div.pft-setting-row', [
-                        h('span', 'Directory key'),
-                        h('span.pft-mono', directory && directory.publicKeyHex ?
-                            shortText(directory.publicKeyHex) : 'Not published')
+                    h('div.pft-settings-summary', [
+                        h('div.pft-setting-row', [
+                            h('span', 'Share address'),
+                            h('span.pft-mono', walletAddress || 'Locked')
+                        ]),
+                        h('div.pft-setting-row', [
+                            h('span', 'Directory key'),
+                            h('span.pft-mono', directory && directory.publicKeyHex ?
+                                shortText(directory.publicKeyHex) : 'Not published')
+                        ]),
+                        h('div.pft-setting-row', [
+                            h('span', 'Published relays'),
+                            h('span.pft-mono', APP.inboxPublishedRelays.length ?
+                                APP.inboxPublishedRelays.join(', ') : 'None')
+                        ])
                     ]),
                     h('label.pft-label', { for: 'pft-settings-relays' }, 'Private relay list'),
                     relays,
                     h('div.pft-inbox-status' + inboxStatusClass, [
-                        h('span.pft-wallet-dot' + (inboxReady ? '.pft-ok' : '')),
+                        h('span.pft-wallet-dot' + inboxDotClass),
                         h('span', inboxStatus)
                     ]),
-                    h('div.pft-actions-row', [publishInbox, copyInbox])
-                ]),
-                h('section.pft-panel', [
-                    h('h2', 'Wallet'),
-                    h('div.pft-setting-row', [
-                        h('span', 'Address'),
-                        h('span.pft-mono', walletAddress || 'Locked')
-                    ]),
-                    h('div.pft-actions-row', [loginVault])
+                    relayFailures.length ? h('div.pft-relay-failures.pft-mono',
+                        relayFailures.join(' | ')) : '',
+                    h('div.pft-actions-row', [publishInbox, copyInbox, loginVault])
                 ])
             ])
         ]);
@@ -1054,6 +1098,7 @@ define([
                 console.error(err);
                 APP.wallet = null;
                 APP.walletSession = null;
+                clearInboxDirectoryState();
                 APP.walletStatus = 'Locked';
             })
         ]).then(render).catch(function (err) {
