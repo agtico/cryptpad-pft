@@ -15,6 +15,9 @@ WS_PORT="${POSTFIAT_ONION_WS_PORT:-3203}"
 SOCKS_HOST="${POSTFIAT_ONION_SOCKS_HOST:-127.0.0.1}"
 SOCKS_PORT="${POSTFIAT_ONION_SOCKS_PORT:-19050}"
 MAX_WORKERS="${POSTFIAT_ONION_MAX_WORKERS:-2}"
+PFTL_RPC_URL="${POSTFIAT_PFTL_RPC_URL:-http://178.156.143.199:5005}"
+PFTL_WSS_URL="${POSTFIAT_PFTL_WSS_URL:-ws://178.156.143.199:6005}"
+PFTL_IPFS_GATEWAY="${POSTFIAT_IPFS_GATEWAY:-https://dweb.link/ipfs/}"
 
 MAIN_DIR="$DATA_DIR/cryptpad-main"
 SAFE_DIR="$DATA_DIR/cryptpad-safe"
@@ -38,6 +41,9 @@ Environment overrides:
   POSTFIAT_ONION_WS_PORT         Local CryptPad websocket port, default 3203
   POSTFIAT_ONION_SOCKS_PORT      Local Tor SOCKS port, default 19050
   POSTFIAT_ONION_COMPRESS        Set to 0 to skip static .gz/.br generation
+  POSTFIAT_PFTL_RPC_URL          PFTL JSON-RPC URL for same-origin Task Node proxy
+  POSTFIAT_PFTL_WSS_URL          PFTL websocket URL for future signing flows
+  POSTFIAT_IPFS_GATEWAY          Preferred IPFS gateway for same-origin Task Node proxy
 EOF
 }
 
@@ -190,6 +196,11 @@ config.logIP = false;
 config.postFiat = config.postFiat || {};
 config.postFiat.walletFirst = true;
 config.postFiat.disableLegacyLogin = false;
+config.postFiat.pftl = config.postFiat.pftl || {};
+config.postFiat.pftl.networkId = 2025;
+config.postFiat.pftl.rpcUrl = '$PFTL_RPC_URL';
+config.postFiat.pftl.wssUrl = '$PFTL_WSS_URL';
+config.postFiat.pftl.ipfsGateway = '$PFTL_IPFS_GATEWAY';
 config.postFiat.nostr = config.postFiat.nostr || {};
 config.postFiat.nostr.privateRelays = [
     'wss://relay.primal.net',

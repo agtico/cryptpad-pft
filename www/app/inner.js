@@ -47,6 +47,10 @@ define([
         driveLoaded: false,
         inboxLoaded: false,
         inboxLoading: false,
+        taskNode: null,
+        taskNodeLoaded: false,
+        taskNodeLoading: false,
+        taskNodeStatus: '',
     };
 
     var common;
@@ -57,6 +61,7 @@ define([
         docs: 'Docs',
         shared: 'Shared with me',
         sent: 'Sent',
+        tasknode: 'Task Node',
         contacts: 'Contacts',
         durable: 'Durable',
         settings: 'Settings',
@@ -132,6 +137,17 @@ define([
         }, timeout || 30000).then(function (obj) {
             if (!obj || !obj.state) {
                 throw new Error(obj && obj.error || 'POSTFIAT_WALLET_SESSION_REQUIRED');
+            }
+            return obj.result;
+        });
+    };
+
+    var loadTaskNodeAction = function (data, timeout) {
+        return queryOuter('Q_POSTFIAT_TASKNODE', {
+            data: data || {}
+        }, timeout || 90000).then(function (obj) {
+            if (!obj || !obj.state) {
+                throw new Error(obj && obj.error || 'POSTFIAT_TASKNODE_UNAVAILABLE');
             }
             return obj.result;
         });
@@ -278,6 +294,7 @@ define([
             APP.wallet = null;
             APP.walletSession = null;
             clearInboxDirectoryState();
+            clearTaskNodeState();
             APP.walletStatus = 'Locked';
             APP.settingsStatus = 'Wallet locked.';
             UI.log('Post Fiat wallet locked.');
@@ -296,6 +313,7 @@ define([
             APP.wallet = null;
             APP.walletSession = null;
             clearInboxDirectoryState();
+            clearTaskNodeState();
             openTopLevel('/login/');
         });
     };
@@ -315,6 +333,7 @@ define([
         APP.wallet = null;
         APP.walletSession = null;
         clearInboxDirectoryState();
+        clearTaskNodeState();
         APP.walletStatus = 'Locked';
         UI.warn(message || 'Unlock your Post Fiat wallet first.');
     };
@@ -347,6 +366,13 @@ define([
         APP.inboxDirectoryState = 'idle';
         APP.inboxPublishedRelays = [];
         APP.inboxPublishFailures = [];
+    };
+
+    var clearTaskNodeState = function () {
+        APP.taskNode = null;
+        APP.taskNodeLoaded = false;
+        APP.taskNodeLoading = false;
+        APP.taskNodeStatus = '';
     };
 
     var getRelayFailureMessage = function (result) {
@@ -581,6 +607,48 @@ define([
         });
     };
 
+    var refreshTaskNode = function () {
+        APP.taskNodeLoading = true;
+        APP.taskNodeStatus = 'Loading Task Node history...';
+        render();
+        getSessionWallet().then(function () {
+            return loadTaskNodeAction({
+                accountTxLimit: 200,
+                maxPages: 8,
+                maxTaskDetails: 120,
+                maxContextDetails: 5,
+                timeoutMs: 12000
+            }, 120000);
+        }).then(function (result) {
+            APP.taskNode = result;
+            APP.taskNodeLoaded = true;
+            APP.taskNodeLoading = false;
+            APP.taskNodeStatus = 'Loaded ' + (result.taskEventCount || 0) +
+                ' task event(s) and ' + (result.contextUpdateCount || 0) +
+                ' context update(s).';
+            render();
+        }).catch(function (err) {
+            console.error(err);
+            APP.taskNode = null;
+            APP.taskNodeLoaded = true;
+            APP.taskNodeLoading = false;
+            if (isWalletSessionError(err)) {
+                APP.taskNodeStatus = isWalletAccountMismatch(err) ?
+                    'Unlocked wallet does not match this workspace account.' :
+                    'Unlock your wallet first.';
+                handleWalletSessionRequired(APP.taskNodeStatus);
+                render();
+                return;
+            }
+            if (err && err.message === 'PFTL RPC is not configured') {
+                APP.taskNodeStatus = 'PFTL RPC is not configured for this instance.';
+            } else {
+                APP.taskNodeStatus = err.message || 'Unable to load Task Node history.';
+            }
+            render();
+        });
+    };
+
     var saveInboxPayload = function (payload) {
         var href = payload && payload.href;
         if (!href) { return void UI.warn(Messages.error); }
@@ -722,6 +790,7 @@ define([
                 docs: 'drive',
                 shared: 'inbox',
                 sent: 'share',
+                tasknode: 'history',
                 contacts: 'contacts',
                 durable: 'upload',
                 settings: 'settings',
@@ -933,6 +1002,134 @@ define([
         ]);
     };
 
+    var taskNodePreview = function (value, max) {
+        var text = typeof(value) === 'string' ? value : '';
+        text = text.replace(/\s+/g, ' ').trim();
+        if (!text) { return ''; }
+        max = max || 180;
+        return text.length > max ? text.slice(0, max - 3) + '...' : text;
+    };
+
+    var renderTaskNode = function () {
+        var data = APP.taskNode || {};
+        var refresh = button('pft-primary-button',
+            APP.taskNodeLoading ? 'Loading' : 'Refresh', 'refresh');
+        if (APP.taskNodeLoading) {
+            refresh.disabled = 'disabled';
+        }
+        $(refresh).on('click', refreshTaskNode);
+
+        var taskGroups = data.tasks || [];
+        var taskRows = taskGroups.map(function (group) {
+            var latest = group.latest || {};
+            var summary = latest.summary || {};
+            var openTx = button('pft-table-button', 'Copy tx', 'copy');
+            $(openTx).on('click', function () {
+                copyText(latest.txHash || '', 'Transaction hash copied.');
+            });
+            return h('tr', [
+                h('td.pft-doc-title-cell', [
+                    h('div.pft-doc-icon', 'T'),
+                    h('div', [
+                        h('div.pft-doc-title', group.taskId || 'Task event'),
+                        h('div.pft-doc-subtitle',
+                            taskNodePreview(summary.preview || latest.cid || ''))
+                    ])
+                ]),
+                h('td', h('span.pft-pill', summary.phase || latest.kindLabel || 'TASK')),
+                h('td', summary.verificationType || ''),
+                h('td', latest.createdAt ? new Date(latest.createdAt).toLocaleString() : ''),
+                h('td.pft-table-actions', [openTx])
+            ]);
+        });
+
+        var contextUpdates = data.contextUpdates || [];
+        var contextRows = contextUpdates.map(function (entry, index) {
+            var copyCid = button('pft-table-button', 'Copy cid', 'copy');
+            $(copyCid).on('click', function () {
+                copyText(entry.cid || '', 'CID copied.');
+            });
+            return h('tr', [
+                h('td.pft-doc-title-cell', [
+                    h('div.pft-doc-icon', 'C'),
+                    h('div', [
+                        h('div.pft-doc-title', index === 0 ? 'Latest context doc' : 'Context update'),
+                        h('div.pft-doc-subtitle', entry.cid || '')
+                    ])
+                ]),
+                h('td', entry.createdAt ? new Date(entry.createdAt).toLocaleString() : ''),
+                h('td.pft-mono', shortText(entry.txHash || '')),
+                h('td.pft-table-actions', [copyCid])
+            ]);
+        });
+
+        var latestContext = data.latestContext || null;
+        var latestText = latestContext && latestContext.text || '';
+        var failures = []
+            .concat(data.taskHydrationFailures || [])
+            .concat(data.contextHydrationFailures || []);
+        var meta = APP.taskNodeStatus || (APP.taskNodeLoaded ?
+            'Task Node history loaded.' : 'Wallet-derived PFTL/IPFS context');
+
+        return h('section.pft-view', [
+            h('div.pft-view-header', [
+                h('div', [
+                    h('h1', 'Task Node'),
+                    h('div.pft-view-meta', meta)
+                ]),
+                refresh
+            ]),
+            h('section.pft-panel.pft-wide-panel', [
+                h('div.pft-panel-heading', [
+                    h('h2', 'Tasks'),
+                    h('span.pft-pill', (data.taskEventCount || 0) + ' event(s)')
+                ]),
+                taskRows.length ? h('div.pft-table-wrap', [
+                    h('table.pft-table', [
+                        h('thead', h('tr', [
+                            h('th', 'Task'),
+                            h('th', 'Kind'),
+                            h('th', 'Evidence'),
+                            h('th', 'Updated'),
+                            h('th', 'Actions')
+                        ])),
+                        h('tbody', taskRows)
+                    ])
+                ]) : h('div.pft-empty', [
+                    h('h2', APP.taskNodeLoaded ? 'No task pointer history' : 'Task history not loaded')
+                ])
+            ]),
+            h('section.pft-panel.pft-wide-panel', [
+                h('div.pft-panel-heading', [
+                    h('h2', 'Context Doc Updates'),
+                    h('span.pft-pill', (data.contextUpdateCount || 0) + ' update(s)')
+                ]),
+                latestText ? h('pre.pft-tasknode-context', latestText) :
+                    h('div.pft-empty', [
+                        h('h2', latestContext && latestContext.error ?
+                            latestContext.error : 'No decrypted context doc')
+                    ]),
+                contextRows.length ? h('div.pft-table-wrap', [
+                    h('table.pft-table', [
+                        h('thead', h('tr', [
+                            h('th', 'Context'),
+                            h('th', 'Saved'),
+                            h('th', 'Tx'),
+                            h('th', 'Actions')
+                        ])),
+                        h('tbody', contextRows)
+                    ])
+                ]) : ''
+            ]),
+            failures.length ? h('div.pft-warning-panel', [
+                h('h2', 'Some IPFS payloads could not be read'),
+                h('div.pft-mono', failures.slice(0, 8).map(function (failure) {
+                    return (failure.cid || '') + ': ' + (failure.error || 'failed');
+                }).join(' | '))
+            ]) : ''
+        ]);
+    };
+
     var renderContacts = function () {
         var rows = APP.contacts.map(function (contact) {
             var shareButton = button('pft-table-button', 'Share', 'share');
@@ -1110,6 +1307,7 @@ define([
     var renderRoute = function () {
         if (APP.route === 'shared') { return renderShared(); }
         if (APP.route === 'sent') { return renderSent(); }
+        if (APP.route === 'tasknode') { return renderTaskNode(); }
         if (APP.route === 'contacts') { return renderContacts(); }
         if (APP.route === 'durable') { return renderDurable(); }
         if (APP.route === 'settings') { return renderSettings(); }
@@ -1134,6 +1332,9 @@ define([
         });
         if (APP.route === 'shared' && !APP.inboxLoaded && !APP.inboxLoading) {
             setTimeout(fetchInbox);
+        }
+        if (APP.route === 'tasknode' && !APP.taskNodeLoaded && !APP.taskNodeLoading) {
+            setTimeout(refreshTaskNode);
         }
     };
 
@@ -1198,6 +1399,7 @@ define([
                 APP.wallet = null;
                 APP.walletSession = null;
                 clearInboxDirectoryState();
+                clearTaskNodeState();
                 APP.walletStatus = 'Locked';
             })
         ]).then(render).catch(function (err) {

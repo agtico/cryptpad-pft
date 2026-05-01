@@ -344,10 +344,10 @@ define([
 	                            cb({ state: true });
 	                        });
 	                    };
-	                    var handlePostFiatShareAction = function (obj, _cb) {
-	                        var cb = Utils.Util.mkAsync(_cb);
-	                        var action = obj && obj.action;
-	                        var data = obj && obj.data || {};
+		                    var handlePostFiatShareAction = function (obj, _cb) {
+		                        var cb = Utils.Util.mkAsync(_cb);
+		                        var action = obj && obj.action;
+		                        var data = obj && obj.data || {};
 	                        require([
 	                            '/common/postfiat-private-share.bundle.js',
 	                        ], function () {
@@ -425,10 +425,48 @@ define([
 	                            cb({
 	                                state: false,
 	                                error: 'POSTFIAT_SHARE_WORKFLOW_UNAVAILABLE'
-	                            });
-	                        });
-	                    };
-	                    startPostFiatWalletResponder();
+		                            });
+		                        });
+		                    };
+		                    var handlePostFiatTaskNodeAction = function (obj, _cb) {
+		                        var cb = Utils.Util.mkAsync(_cb);
+		                        var data = obj && obj.data || {};
+		                        var Core = window.PostFiatWalletCore;
+
+		                        if (!Core || typeof(Core.loadTaskNodeHistory) !== 'function') {
+		                            return void cb({
+		                                state: false,
+		                                error: 'POSTFIAT_TASKNODE_UNAVAILABLE'
+		                            });
+		                        }
+
+		                        getPostFiatWalletSession().then(function (session) {
+		                            return Core.loadTaskNodeHistory({
+		                                mnemonic: session.mnemonic,
+		                                walletAddress: session.wallet.address,
+		                                accountTxLimit: data.accountTxLimit,
+		                                maxPages: data.maxPages,
+		                                maxTaskDetails: data.maxTaskDetails,
+		                                maxContextDetails: data.maxContextDetails,
+		                                timeoutMs: data.timeoutMs
+		                            });
+		                        }).then(function (result) {
+		                            cb({
+		                                state: true,
+		                                result: result
+		                            });
+		                        }).catch(function (err) {
+		                            console.error(err);
+		                            cb({
+		                                state: false,
+		                                error: (err && err.message) || 'POSTFIAT_WALLET_SESSION_REQUIRED',
+		                                accountName: Utils.LocalStore.getAccountName(),
+		                                walletSession: Utils.LocalStore.isWalletSession &&
+		                                    Utils.LocalStore.isWalletSession()
+		                            });
+		                        });
+		                    };
+		                    startPostFiatWalletResponder();
                     sframeChan.on('Q_SETTINGS_CHECK_PASSWORD', function (data, cb) {
                         var blockHash = Utils.LocalStore.getBlockHash();
                         var userHash = Utils.LocalStore.getUserHash();
@@ -517,9 +555,10 @@ define([
 	                        });
 		                    });
 	                    });
-	                    sframeChan.on('Q_POSTFIAT_WALLET_UNLOCK', handlePostFiatWalletUnlock);
-	                    sframeChan.on('Q_POSTFIAT_WALLET_SWITCH', handlePostFiatWalletSwitch);
-	                    sframeChan.on('Q_POSTFIAT_WALLET_SHARE', handlePostFiatShareAction);
+		                    sframeChan.on('Q_POSTFIAT_WALLET_UNLOCK', handlePostFiatWalletUnlock);
+		                    sframeChan.on('Q_POSTFIAT_WALLET_SWITCH', handlePostFiatWalletSwitch);
+		                    sframeChan.on('Q_POSTFIAT_WALLET_SHARE', handlePostFiatShareAction);
+		                    sframeChan.on('Q_POSTFIAT_TASKNODE', handlePostFiatTaskNodeAction);
                     Cryptpad.loading.onMissingMFAEvent.reg((data) => {
                         var cb = data.cb;
                         if (!sframeChan) { return void cb('EINVAL'); }

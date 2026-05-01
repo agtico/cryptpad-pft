@@ -14,8 +14,14 @@ import {
     createMnemonic,
     createSessionWallet,
     decryptMnemonicVault,
+    decryptTaskNodePayload,
+    decodeTaskNodePointerMemo,
     deriveWalletFromMnemonic,
+    deriveTaskNodeX25519KeypairFromMnemonic,
+    encodeTaskNodePublicKey,
     encryptMnemonicVault,
+    encryptTaskNodePayloadForTests,
+    extractTaskNodePointerEvents,
     getSavedWalletMeta,
     isValidMnemonic,
     messageToHex,
@@ -35,6 +41,39 @@ const TEST_ADDRESS = 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC';
 const TEST_PUBLIC_KEY = '03543B859FF40BF433302D20A322DB4EAD92D112F6C20F52864468262E083DC9EE';
 const TEST_ACCESS_MESSAGE = `PostFiat Access: ${TEST_ADDRESS}`;
 const TEST_ACCESS_SIGNATURE = '30450221008A2DE9A6BC4185AF7B2332654148FD12886B3032B8E22EA215726CE68596987F022055C2B7B41E96E4FC9D67342B96F274AC6CD51DBE82F9DF97975A3A9D5E380AF3';
+
+const encodeVarint = (value) => {
+    const bytes = [];
+    let current = value;
+    while (current > 0x7f) {
+        bytes.push((current & 0x7f) | 0x80);
+        current >>>= 7;
+    }
+    bytes.push(current);
+    return Buffer.from(bytes);
+};
+
+const encodeStringField = (fieldNumber, value) => {
+    const body = Buffer.from(String(value), 'utf8');
+    return Buffer.concat([
+        encodeVarint((fieldNumber << 3) | 2),
+        encodeVarint(body.length),
+        body,
+    ]);
+};
+
+const encodeVarintField = (fieldNumber, value) => Buffer.concat([
+    encodeVarint((fieldNumber << 3) | 0),
+    encodeVarint(value),
+]);
+
+const buildPointerMemoHex = ({ cid, kind, schema, taskId, flags }) => Buffer.concat([
+    encodeStringField(1, cid),
+    encodeVarintField(3, kind),
+    encodeVarintField(4, schema),
+    taskId ? encodeStringField(5, taskId) : Buffer.alloc(0),
+    encodeVarintField(8, flags),
+]).toString('hex').toUpperCase();
 
 const makeStorage = () => {
     const values = new Map();
@@ -104,6 +143,102 @@ test('derives the Task Node XRPL wallet path', () => {
     assert.equal(wallet.derivationPath, DEFAULT_DERIVATION_PATH);
     assert.equal(wallet.address, TEST_ADDRESS);
     assert.equal(wallet.publicKey, TEST_PUBLIC_KEY);
+});
+
+test('decrypts Task Node X25519 payloads with the wallet mnemonic', async () => {
+    const keypair = await deriveTaskNodeX25519KeypairFromMnemonic(TEST_MNEMONIC);
+    const publicKey = await encodeTaskNodePublicKey(keypair.publicKey);
+    const blob = await encryptTaskNodePayloadForTests({
+        plaintext: JSON.stringify({ task_id: 'task-1', phase: 'submission' }),
+        recipientPublicKeys: [publicKey],
+    });
+
+    const plaintext = await decryptTaskNodePayload({
+        blob,
+        mnemonic: TEST_MNEMONIC,
+    });
+
+    assert.deepEqual(JSON.parse(plaintext), {
+        task_id: 'task-1',
+        phase: 'submission',
+    });
+});
+
+test('rejects Task Node blobs with mismatched content hashes', async () => {
+    const keypair = await deriveTaskNodeX25519KeypairFromMnemonic(TEST_MNEMONIC);
+    const publicKey = await encodeTaskNodePublicKey(keypair.publicKey);
+    const blob = await encryptTaskNodePayloadForTests({
+        plaintext: 'context update',
+        recipientPublicKeys: [publicKey],
+    });
+
+    blob.content_hash = '00'.repeat(32);
+
+    await assert.rejects(() => decryptTaskNodePayload({
+        blob,
+        mnemonic: TEST_MNEMONIC,
+    }), /TASKNODE_CONTENT_HASH_MISMATCH/);
+});
+
+test('decodes pf.ptr v4 Task Node pointers from XRPL memos', () => {
+    const memoData = buildPointerMemoHex({
+        cid: 'bafybeigdyrztestcidforcontextpointer12345',
+        kind: 5,
+        schema: 1,
+        flags: 1,
+    });
+
+    const pointer = decodeTaskNodePointerMemo(memoData);
+
+    assert.equal(pointer.cid, 'bafybeigdyrztestcidforcontextpointer12345');
+    assert.equal(pointer.kind, 5);
+    assert.equal(pointer.kindLabel, 'CONTEXT');
+    assert.equal(pointer.schema, 1);
+    assert.equal(pointer.flags, 1);
+});
+
+test('extracts task and context pointer events from account_tx rows', () => {
+    const contextMemo = buildPointerMemoHex({
+        cid: 'bafybeigdyrzcontextcid000000000000000000',
+        kind: 5,
+        schema: 1,
+        flags: 1,
+    });
+    const taskMemo = buildPointerMemoHex({
+        cid: 'bafybeigdyrztaskcid000000000000000000000',
+        kind: 3,
+        schema: 1,
+        taskId: 'task-123',
+        flags: 1,
+    });
+    const events = extractTaskNodePointerEvents([{
+        tx: {
+            hash: 'ABC',
+            Account: TEST_ADDRESS,
+            Destination: 'rDestinationWallet1111111111111111',
+            date: 820454400,
+            ledger_index: 123,
+            Memos: [{
+                Memo: {
+                    MemoType: Buffer.from('pf.ptr').toString('hex').toUpperCase(),
+                    MemoFormat: Buffer.from('v4').toString('hex').toUpperCase(),
+                    MemoData: contextMemo,
+                },
+            }, {
+                Memo: {
+                    MemoType: Buffer.from('pf.ptr').toString('hex').toUpperCase(),
+                    MemoFormat: Buffer.from('v4').toString('hex').toUpperCase(),
+                    MemoData: taskMemo,
+                },
+            }],
+        },
+    }], TEST_ADDRESS);
+
+    assert.equal(events.length, 2);
+    assert.equal(events[0].direction, 'outbound');
+    assert.equal(events[0].ledgerIndex, 123);
+    assert.deepEqual(events.map((event) => event.kindLabel).sort(), ['CONTEXT', 'TASK_SUBMISSION']);
+    assert.equal(events.find((event) => event.kindLabel === 'TASK_SUBMISSION').taskId, 'task-123');
 });
 
 test('signs and verifies canonical Post Fiat access messages', () => {

@@ -93,6 +93,8 @@ Status values:
 - [ ] If Orchard/shielded PFTL is added, keep document CIDs/manifests/pinning metadata out of the shielded transaction path unless the user explicitly opts in.
 - [ ] Label durable publication with clear privacy warnings about observable CIDs, pinning providers, gateways, timing, and retention.
 - [ ] Add tests for decrypt, share, rotate, and corrupted manifest/blob handling.
+- [~] Add Task Node read-only history surface for wallet-owned `pf.ptr/v4` context and task submission pointers.
+- [~] Reuse Task Node X25519 payload decryption so unlocked wallets can read their context/evidence blobs without seed repaste.
 
 ## Phase 6: UI Redesign
 
@@ -116,6 +118,7 @@ Status values:
 - [~] Add PFT-native share modal.
 - [~] Build `/app/shared/` as a first-class encrypted inbox.
 - [~] Build `/app/sent/` for sent share history and relay delivery status.
+- [~] Build `/app/#tasknode` for Task Node tasks and context doc updates.
 - [~] Build `/app/contacts/` for wallet contacts, inbox directory refresh, and first-contact recovery.
 - [~] Build `/app/durable/` as an explicit PFTL/IPFS publication workspace with privacy review.
 - [~] Review mobile layout for workspace, editor, wallet unlock, share, inbox, and contacts flows.
@@ -129,13 +132,13 @@ Status values:
 - [x] Add repeatable onion dev runner and docs.
 - [x] Switch onion hosted testing off `DEV=1` so stable `?ver=` asset caching works over Tor.
 - [x] Add precompressed `.gz`/`.br` static asset generation for onion performance.
-- [ ] Decide whether Post Fiat APIs live in `lib/http-worker.js` or a separate module.
+- [~] Decide whether Post Fiat APIs live in `lib/http-worker.js` or a separate module.
 - [~] Add environment config for Nostr relays, relay discovery, relay retention, and optional PFT-operated private relay defaults.
 - [~] Add environment config for PFTL RPC/WSS, network id, IPFS gateway, and pinning backend.
 - [ ] Add optional Nostr relay proxy for privacy-preserving relay access from hosted instances.
 - [ ] Add wallet nonce verification endpoint for server sessions.
-- [ ] Add PFTL pointer list endpoint with pagination.
-- [ ] Add manifest/blob fetch endpoints preserving signatures.
+- [~] Add PFTL pointer/account transaction proxy with pagination.
+- [~] Add IPFS JSON fetch proxy for Task Node encrypted blobs without browser-side gateway egress.
 - [x] Add Docker compose example for standalone open-source instance.
 - [x] Document AGPL source distribution obligations.
 
