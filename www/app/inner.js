@@ -153,13 +153,33 @@ define([
         });
     };
 
+    var getLoggedInWalletAccount = function () {
+        var metadataMgr = common && common.getMetadataMgr && common.getMetadataMgr();
+        var privateData = metadataMgr && metadataMgr.getPrivateData && metadataMgr.getPrivateData();
+        var userData = metadataMgr && metadataMgr.getUserData && metadataMgr.getUserData();
+        var accountName = privateData && privateData.accountName || userData && userData.name;
+
+        return isWalletAddress(accountName) ? accountName : '';
+    };
+
     var setUnlockedWalletSession = function (session) {
         var Core = getWalletCore();
+        var accountName;
+
         if (!session || !session.mnemonic) {
             throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
         }
         if (!session.wallet) {
             session.wallet = Core.deriveWalletFromMnemonic(session.mnemonic);
+        }
+        accountName = getLoggedInWalletAccount();
+        if (accountName && session.wallet.address !== accountName) {
+            if (Core && typeof(Core.clearSessionWallet) === 'function') {
+                Promise.resolve(Core.clearSessionWallet()).catch(function (err) {
+                    console.error(err);
+                });
+            }
+            throw new Error('POSTFIAT_WALLET_ACCOUNT_MISMATCH');
         }
         APP.wallet = session.wallet;
         APP.walletSession = session;
@@ -170,7 +190,7 @@ define([
     var getSessionWallet = function () {
         var Core = getWalletCore();
         if (APP.walletSession && APP.walletSession.mnemonic) {
-            return Promise.resolve(APP.walletSession);
+            return Promise.resolve(setUnlockedWalletSession(APP.walletSession));
         }
         return Promise.resolve().then(function () {
             return Core.restoreSessionWallet();
@@ -232,7 +252,14 @@ define([
     };
 
     var isWalletSessionError = function (err) {
-        return err && err.message === 'POSTFIAT_WALLET_SESSION_REQUIRED';
+        return err && (
+            err.message === 'POSTFIAT_WALLET_SESSION_REQUIRED' ||
+            err.message === 'POSTFIAT_WALLET_ACCOUNT_MISMATCH'
+        );
+    };
+
+    var isWalletAccountMismatch = function (err) {
+        return err && err.message === 'POSTFIAT_WALLET_ACCOUNT_MISMATCH';
     };
 
     var handleWalletSessionRequired = function (message) {
@@ -256,6 +283,9 @@ define([
         }
         if (code === 'INVALID_POSTFIAT_RECIPIENT') {
             return 'Recipient is not a valid wallet address or inbox.';
+        }
+        if (code === 'POSTFIAT_WALLET_ACCOUNT_MISMATCH') {
+            return 'Unlocked wallet does not match this workspace account.';
         }
         return code || 'Unable to send share.';
     };
@@ -456,8 +486,9 @@ define([
         }).catch(function (err) {
             console.error(err);
             if (isWalletSessionError(err)) {
-                handleWalletSessionRequired('Unlock your Post Fiat wallet before sharing.');
-                APP.shareStatus = 'Unlock your wallet first.';
+                APP.shareStatus = isWalletAccountMismatch(err) ?
+                    getShareErrorMessage(err) : 'Unlock your wallet first.';
+                handleWalletSessionRequired(APP.shareStatus);
                 render();
                 return;
             }
@@ -500,8 +531,10 @@ define([
             APP.inboxLoaded = true;
             APP.inboxLoading = false;
             if (isWalletSessionError(err)) {
-                handleWalletSessionRequired('Unlock your Post Fiat wallet to refresh shares.');
-                APP.inboxStatus = 'Unlock your wallet first.';
+                APP.inboxStatus = isWalletAccountMismatch(err) ?
+                    'Unlocked wallet does not match this workspace account.' :
+                    'Unlock your wallet first.';
+                handleWalletSessionRequired(APP.inboxStatus);
                 render();
                 return;
             }
@@ -555,8 +588,10 @@ define([
         }).catch(function (err) {
             console.error(err);
             if (isWalletSessionError(err)) {
-                handleWalletSessionRequired('Unlock your Post Fiat wallet to copy your inbox.');
-                APP.settingsStatus = 'Unlock your wallet first.';
+                APP.settingsStatus = isWalletAccountMismatch(err) ?
+                    'Unlocked wallet does not match this workspace account.' :
+                    'Unlock your wallet first.';
+                handleWalletSessionRequired(APP.settingsStatus);
                 render();
                 return;
             }
@@ -610,8 +645,10 @@ define([
         }).catch(function (err) {
             console.error(err);
             if (isWalletSessionError(err)) {
-                handleWalletSessionRequired('Unlock your Post Fiat wallet to publish your inbox.');
-                APP.settingsStatus = 'Unlock your wallet first.';
+                APP.settingsStatus = isWalletAccountMismatch(err) ?
+                    'Unlocked wallet does not match this workspace account.' :
+                    'Unlock your wallet first.';
+                handleWalletSessionRequired(APP.settingsStatus);
                 render();
                 return;
             }

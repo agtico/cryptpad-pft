@@ -19,7 +19,8 @@ define([
         const forceLegacyLogin = forceStandardLogin || hash === "#legacy-login";
         const explicitWalletVault = hash === "#wallet-vault" || hash === "#unlock-wallet";
         const alreadyLoggedIn = LocalStore.isLoggedIn();
-        const forceWalletVault = explicitWalletVault || (alreadyLoggedIn && !forceLegacyLogin);
+        const switchWalletLogin = alreadyLoggedIn && !explicitWalletVault && !forceLegacyLogin;
+        const forceWalletVault = explicitWalletVault;
         const postFiat = Config.postFiat || {};
         const walletFirst = postFiat.walletFirst !== false;
         const legacyDisabled = postFiat.disableLegacyLogin === true;
@@ -27,7 +28,7 @@ define([
             (walletFirst && !forceLegacyLogin)) ? '.cp-hidden' : '';
         var legacyToggleHidden = (forceWalletVault || !walletFirst ||
             legacyDisabled || forceLegacyLogin) ? '.cp-hidden' : '';
-        var importRecentHidden = forceWalletVault ? '.cp-hidden' : '';
+        var importRecentHidden = (forceWalletVault || switchWalletLogin) ? '.cp-hidden' : '';
         var ssoEnabled = (ssoLength && !forceStandardLogin) ? '': '.cp-hidden';
         var ssoEnforced = (Config?.sso?.force && !forceStandardLogin) ? '.cp-hidden' : '';
         if (ssoLength === 1 && ssoEnforced) {
@@ -59,10 +60,13 @@ define([
             Pages.infopageTopbar(),
             h('div.container.cp-container', [
                 h('div.row.cp-page-title', h('h1', forceWalletVault ?
-                    'Unlock Post Fiat wallet' : 'Post Fiat Docs')),
+                    'Unlock Post Fiat wallet' : (switchWalletLogin ?
+                        'Switch Post Fiat wallet' : 'Post Fiat Docs'))),
                 h('div.row.cp-page-title.pft-login-subtitle', h('p', forceWalletVault ?
                     'Unlock the wallet signer used for sharing and inbox access.' :
-                    'Open a private document workspace with your Post Fiat wallet.')),
+                    (switchWalletLogin ?
+                        'Log in with a different Post Fiat wallet for this tab.' :
+                    'Open a private document workspace with your Post Fiat wallet.'))),
                 h('div.row', [
                     h('div.col-md-3'+ssoEnforced),
                     h('div#userForm.form-group.col-md-6'+ssoEnforced, [

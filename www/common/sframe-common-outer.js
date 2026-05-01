@@ -883,6 +883,7 @@ define([
                     var additionalPriv = {
                         app: parsed.type,
                         loggedIn: Utils.LocalStore.isLoggedIn(),
+                        accountName: Utils.LocalStore.getAccountName(),
                         origin: window.location.origin,
                         pathname: window.location.pathname,
                         fileHost: ApiConfig.fileHost,

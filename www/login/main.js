@@ -26,9 +26,9 @@ define([
         const forceLegacyLogin = forceStandardLogin || hash === "#legacy-login";
         const explicitWalletVault = hash === "#wallet-vault" || hash === "#unlock-wallet";
         const alreadyLoggedIn = LocalStore.isLoggedIn();
-        const forceWalletVault = explicitWalletVault || (alreadyLoggedIn && !forceLegacyLogin);
-        const redirectLoggedInWhenWalletUnlocked = alreadyLoggedIn && !explicitWalletVault &&
-            !forceLegacyLogin;
+        const switchWalletLogin = alreadyLoggedIn && !explicitWalletVault && !forceLegacyLogin;
+        const forceWalletVault = explicitWalletVault;
+        const redirectLoggedInWhenWalletUnlocked = false;
 
         const postFiat = Config.postFiat || {};
         const walletFirst = postFiat.walletFirst !== false;
@@ -147,6 +147,13 @@ define([
             $('#pft-legacy-login').addClass('cp-hidden');
             $checkImport.closest('.checkbox-container').addClass('cp-hidden');
             $saveWallet.prop('checked', true).prop('disabled', true);
+        } else if (switchWalletLogin) {
+            $('.cp-page-title h1').text('Switch Post Fiat wallet');
+            $('.pft-login-subtitle p').text(
+                'Log in with a different Post Fiat wallet for this tab.'
+            );
+            $checkImport.closest('.checkbox-container').addClass('cp-hidden');
+            $saveWallet.prop('checked', false).prop('disabled', false);
         }
         var getWalletCore = function (quiet) {
             var Core = window.PostFiatWalletCore;
@@ -446,6 +453,7 @@ define([
                 }
                 var saved = await Core.unlockSavedWallet(password);
                 if (forceWalletVault && alreadyLoggedIn) {
+                    assertWalletMatchesAccount(saved.wallet);
                     await startWalletSession(Core, saved.mnemonic);
                     UI.log('Post Fiat wallet unlocked.');
                     redirectAfterVaultSetup();
@@ -454,6 +462,9 @@ define([
                 await loginWithMnemonic(Core, saved.mnemonic, $checkImport[0].checked);
             } catch (err) {
                 console.error(err);
+                if (err.message === 'WALLET_ACCOUNT_MISMATCH') {
+                    return void UI.warn('This saved wallet does not match the logged-in wallet account.');
+                }
                 UI.warn('Unable to unlock saved Post Fiat wallet.');
             }
         };

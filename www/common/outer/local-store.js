@@ -70,6 +70,19 @@ define([
             pftSessionWalletStorageKey,
         ].concat(walletLoginSessionKeys));
     };
+    var removeMismatchedSessionWallet = function (name) {
+        var raw = sessionStorage[pftSessionWalletStorageKey];
+        var record;
+
+        if (!raw) { return; }
+        try {
+            record = JSON.parse(raw);
+        } catch (err) {
+            console.error(err);
+        }
+        if (record && record.address === name) { return; }
+        removeWalletSessionKeys([pftSessionWalletStorageKey]);
+    };
     var isWalletAddress = function (name) {
         return typeof(name) === 'string' && pftWalletAddressPattern.test(name);
     };
@@ -120,6 +133,7 @@ define([
 
         removeLocalLogin();
         removeWalletLoginSession();
+        removeMismatchedSessionWallet(payload.userName);
         safeSessionSet(pftWalletSessionKey, '1');
         safeSessionSet(Constants.userNameKey, payload.userName);
         safeSessionSet(Constants.blockHashKey, payload.blockHash);
@@ -351,6 +365,8 @@ define([
     LocalStore.login = function (userHash, blockHash, name, cb) {
         if (!userHash && !blockHash) { throw new Error('expected a user hash'); }
         if (!name) { throw new Error('expected a user name'); }
+        removeWalletSession();
+        stopWalletSessionResponder();
         if (userHash) { LocalStore.setUserHash(userHash); }
         if (blockHash) { LocalStore.setBlockHash(blockHash); }
         safeSet(Constants.userNameKey, name);
@@ -361,6 +377,7 @@ define([
         if (!name) { throw new Error('expected a user name'); }
         removeLocalLogin();
         removeWalletLoginSession();
+        removeMismatchedSessionWallet(name);
         safeSessionSet(pftWalletSessionKey, '1');
         if (userHash) { safeSessionSet(Constants.userHashKey, Hash.serializeHash(userHash)); }
         if (blockHash) { safeSessionSet(Constants.blockHashKey, blockHash); }

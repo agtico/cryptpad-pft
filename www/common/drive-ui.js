@@ -3863,6 +3863,37 @@ define([
                 .map(function (relay) { return relay.trim(); })
                 .filter(Boolean);
         };
+        var isPostFiatWalletAddress = function (value) {
+            return /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/u.test(String(value || '').trim());
+        };
+        var getLoggedInPostFiatAccount = function () {
+            var privateData = metadataMgr && metadataMgr.getPrivateData &&
+                metadataMgr.getPrivateData();
+            var userData = metadataMgr && metadataMgr.getUserData &&
+                metadataMgr.getUserData();
+            var accountName = privateData && privateData.accountName ||
+                userData && userData.name;
+
+            return isPostFiatWalletAddress(accountName) ? accountName : '';
+        };
+        var assertPostFiatSessionMatchesAccount = function (session) {
+            var Core = window.PostFiatWalletCore;
+            var accountName = getLoggedInPostFiatAccount();
+
+            if (!session || !session.mnemonic) { return session; }
+            if (!session.wallet) {
+                session.wallet = Core.deriveWalletFromMnemonic(session.mnemonic);
+            }
+            if (accountName && session.wallet.address !== accountName) {
+                if (Core && typeof(Core.clearSessionWallet) === 'function') {
+                    Promise.resolve(Core.clearSessionWallet()).catch(function (err) {
+                        console.error(err);
+                    });
+                }
+                throw new Error('POSTFIAT_WALLET_ACCOUNT_MISMATCH');
+            }
+            return session;
+        };
 
         var requestOuterPostFiatSessionWallet = function () {
             var Core = window.PostFiatWalletCore;
@@ -3929,7 +3960,7 @@ define([
             if (!session || !session.mnemonic) {
                 throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
             }
-            return session;
+            return assertPostFiatSessionMatchesAccount(session);
         };
 
         var getPostFiatPayloadHref = function (payload) {

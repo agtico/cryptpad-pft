@@ -104,13 +104,28 @@ test('wallet logins store the login capability in session storage only', () => {
     assert.equal(sessionStorage[Constants.blockHashKey], 'wallet-block');
 });
 
-test('wallet login persistence preserves an unlocked session wallet', () => {
+test('wallet login clears a stale unlocked signer for a different wallet', () => {
     const { LocalStore, sessionStorage } = loadLocalStore();
 
-    sessionStorage.PFT_session_wallet = '{"version":1}';
+    sessionStorage.PFT_session_wallet =
+        '{"version":1,"address":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"}';
     LocalStore.walletLogin(undefined, 'wallet-block', 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
 
-    assert.equal(sessionStorage.PFT_session_wallet, '{"version":1}');
+    assert.equal(sessionStorage.PFT_session_wallet, undefined);
+    assert.equal(LocalStore.isWalletSession(), true);
+});
+
+test('wallet login preserves an unlocked signer for the same wallet', () => {
+    const { LocalStore, sessionStorage } = loadLocalStore();
+
+    sessionStorage.PFT_session_wallet =
+        '{"version":1,"address":"rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC"}';
+    LocalStore.walletLogin(undefined, 'wallet-block', 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+
+    assert.equal(
+        sessionStorage.PFT_session_wallet,
+        '{"version":1,"address":"rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC"}'
+    );
     assert.equal(LocalStore.isWalletSession(), true);
 });
 
@@ -153,6 +168,35 @@ test('wallet session imports reject non-wallet identities', () => {
         blockHash: 'wallet-block',
     }), false);
     assert.equal(LocalStore.isLoggedIn(), false);
+});
+
+test('wallet session imports clear a stale signer for another wallet', () => {
+    const { LocalStore, sessionStorage } = loadLocalStore();
+
+    sessionStorage.PFT_session_wallet =
+        '{"version":1,"address":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"}';
+    assert.equal(LocalStore.importWalletSession({
+        userName: 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC',
+        blockHash: 'wallet-block',
+    }), true);
+
+    assert.equal(sessionStorage.PFT_session_wallet, undefined);
+    assert.equal(LocalStore.getAccountName(), 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+});
+
+test('password login clears wallet-only session state', () => {
+    const { LocalStore, sessionStorage, localStorage } = loadLocalStore();
+
+    LocalStore.walletLogin(undefined, 'wallet-block', 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+    sessionStorage.PFT_session_wallet =
+        '{"version":1,"address":"rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC"}';
+    LocalStore.login(undefined, 'persistent-block', 'alice');
+
+    assert.equal(LocalStore.isWalletSession(), false);
+    assert.equal(sessionStorage.PFT_wallet_session, undefined);
+    assert.equal(sessionStorage.PFT_session_wallet, undefined);
+    assert.equal(localStorage[Constants.blockHashKey], 'persistent-block');
+    assert.equal(LocalStore.getAccountName(), 'alice');
 });
 
 test('wallet lock clears only the current wallet session', () => {

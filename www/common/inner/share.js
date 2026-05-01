@@ -434,6 +434,35 @@ define([
         }
         return Core;
     };
+    var isPostFiatWalletAddress = function (value) {
+        return /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/u.test(String(value || '').trim());
+    };
+    var getLoggedInPostFiatAccount = function (common) {
+        var metadataMgr = common && common.getMetadataMgr && common.getMetadataMgr();
+        var privateData = metadataMgr && metadataMgr.getPrivateData && metadataMgr.getPrivateData();
+        var userData = metadataMgr && metadataMgr.getUserData && metadataMgr.getUserData();
+        var accountName = privateData && privateData.accountName || userData && userData.name;
+
+        return isPostFiatWalletAddress(accountName) ? accountName : '';
+    };
+    var assertPostFiatSessionMatchesAccount = function (common, session) {
+        var Core = getPostFiatWalletCore();
+        var accountName = getLoggedInPostFiatAccount(common);
+
+        if (!session || !session.mnemonic) { return session; }
+        if (!session.wallet) {
+            session.wallet = Core.deriveWalletFromMnemonic(session.mnemonic);
+        }
+        if (accountName && session.wallet.address !== accountName) {
+            if (typeof(Core.clearSessionWallet) === 'function') {
+                Promise.resolve(Core.clearSessionWallet()).catch(function (err) {
+                    console.error(err);
+                });
+            }
+            throw new Error('POSTFIAT_WALLET_ACCOUNT_MISMATCH');
+        }
+        return session;
+    };
 
     var requestOuterPostFiatSessionWallet = function (common) {
         var Core = getPostFiatWalletCore();
@@ -495,7 +524,7 @@ define([
         if (!session || !session.mnemonic) {
             throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
         }
-        return session;
+        return assertPostFiatSessionMatchesAccount(common, session);
     };
 
     var getPostFiatTab = function (Env, data, opts, _cb) {
