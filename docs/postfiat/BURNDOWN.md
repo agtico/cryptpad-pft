@@ -101,6 +101,7 @@ Status values:
 - [x] Redirect successful wallet login to `/app/`, not `/drive/`.
 - [x] Keep `/drive/` accessible as a legacy/advanced escape hatch during migration.
 - [x] Build a Post Fiat shell with top bar, wallet badge, lock state, search, new document action, desktop left rail, and mobile bottom nav.
+- [x] Add an in-app wallet unlock action for logged-in accounts whose wallet signer session is locked.
 - [x] Replace stock landing/login surfaces with wallet-first flows.
 - [~] Replace the stock CryptPad drive with a modern document workspace backed by CryptPad drive data.
 - [~] Add document filters for owned, shared, recent, and archived docs.

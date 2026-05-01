@@ -8,14 +8,18 @@ define([
     '/customize/messages.js',
     '/customize/pages.js',
     '/api/config',
-], function (h, UI, Msg, Pages, Config) {
+    '/common/outer/local-store.js',
+], function (h, UI, Msg, Pages, Config, LocalStore) {
     return function () {
         document.title = Msg.login_login;
 
         const ssoLength = Config?.sso?.list?.length;
-        const forceStandardLogin = window.location.hash === "#standard-login";
-        const forceLegacyLogin = forceStandardLogin || window.location.hash === "#legacy-login";
-        const forceWalletVault = window.location.hash === "#wallet-vault";
+        const hash = window.location.hash;
+        const forceStandardLogin = hash === "#standard-login";
+        const forceLegacyLogin = forceStandardLogin || hash === "#legacy-login";
+        const explicitWalletVault = hash === "#wallet-vault" || hash === "#unlock-wallet";
+        const alreadyLoggedIn = LocalStore.isLoggedIn();
+        const forceWalletVault = explicitWalletVault || (alreadyLoggedIn && !forceLegacyLogin);
         const postFiat = Config.postFiat || {};
         const walletFirst = postFiat.walletFirst !== false;
         const legacyDisabled = postFiat.disableLegacyLogin === true;
@@ -54,15 +58,16 @@ define([
             Pages.infopageTopbar(),
             h('div.container.cp-container', [
                 h('div.row.cp-page-title', h('h1', forceWalletVault ?
-                    'Post Fiat wallet vault' : 'Post Fiat Docs')),
+                    'Unlock Post Fiat wallet' : 'Post Fiat Docs')),
                 h('div.row.cp-page-title.pft-login-subtitle', h('p', forceWalletVault ?
-                    'Save or unlock the local encrypted wallet vault.' :
+                    'Unlock the wallet signer used for sharing and inbox access.' :
                     'Open a private document workspace with your Post Fiat wallet.')),
                 h('div.row', [
                     h('div.col-md-3'+ssoEnforced),
                     h('div#userForm.form-group.col-md-6'+ssoEnforced, [
                         h('div.cp-postfiat-wallet-login', [
-                            h('div.cp-login-instance', 'Post Fiat wallet'),
+                            h('div.cp-login-instance', forceWalletVault ?
+                                'Wallet unlock' : 'Post Fiat wallet'),
                             h('div#pft-saved-wallet.cp-hidden', [
                                 h('div.big-container', [
                                     h('div.input-container', [
@@ -130,9 +135,10 @@ define([
                                     ]),
                                 ]),
                             ]),
-                            h('div.big-container', [
+                            h('div#pft-seed-login.big-container', [
                                 h('div.input-container', [
-                                    h('label.cp-default-label', { for: 'pft-mnemonic' }, '24-word seed phrase'),
+                                    h('label.cp-default-label', { for: 'pft-mnemonic' }, forceWalletVault ?
+                                        'Recover wallet with 24-word seed phrase' : '24-word seed phrase'),
                                     h('textarea.form-control#pft-mnemonic', {
                                         name: 'pft-mnemonic',
                                         autocomplete: 'off',
@@ -152,10 +158,10 @@ define([
                                     }),
                                 ]),
                             ]),
-                            h('div.checkbox-container', [
+                            h('div#pft-save-wallet-row.checkbox-container', [
                                 UI.createCheckbox('pft-save-wallet', 'Save encrypted wallet on this browser', true),
                             ]),
-                            h('div.extra', [
+                            h('div#pft-seed-actions.extra', [
                                 h('button#pft-wallet-login.btn.btn-primary', {
                                     type: 'button',
                                 }, 'Log in with seed'),

@@ -21,15 +21,14 @@ define([
     if (window.top !== window) { return; }
     $(function () {
         var $checkImport = $('#import-recent');
-        const forceStandardLogin = window.location.hash === "#standard-login";
-        const forceLegacyLogin = forceStandardLogin || window.location.hash === "#legacy-login";
-        const forceWalletVault = window.location.hash === "#wallet-vault";
+        const hash = window.location.hash;
+        const forceStandardLogin = hash === "#standard-login";
+        const forceLegacyLogin = forceStandardLogin || hash === "#legacy-login";
+        const explicitWalletVault = hash === "#wallet-vault" || hash === "#unlock-wallet";
         const alreadyLoggedIn = LocalStore.isLoggedIn();
-        if (alreadyLoggedIn && !forceWalletVault) {
-            // already logged in, redirect to the Post Fiat workspace
-            document.location.href = '/app/';
-            return;
-        }
+        const forceWalletVault = explicitWalletVault || (alreadyLoggedIn && !forceLegacyLogin);
+        const redirectLoggedInWhenWalletUnlocked = alreadyLoggedIn && !explicitWalletVault &&
+            !forceLegacyLogin;
 
         const postFiat = Config.postFiat || {};
         const walletFirst = postFiat.walletFirst !== false;
@@ -124,14 +123,23 @@ define([
         var $savePassword = $('#pft-save-password');
         var $savePasswordContainer = $('#pft-save-password-container');
         var $saveWallet = $('#pft-save-wallet');
+        var $saveWalletRow = $('#pft-save-wallet-row');
         var $savedWallet = $('#pft-saved-wallet');
         var $savedWalletAddress = $('#pft-saved-wallet-address');
+        var $seedLogin = $('#pft-seed-login');
+        var $seedActions = $('#pft-seed-actions');
         var $generatedWallet = $('#pft-generated-wallet');
         var $generatedMnemonic = $('#pft-generated-mnemonic');
         var $generatedAddress = $('#pft-generated-wallet-address');
         var $generatedConfirm = $('#pft-generated-confirm');
         if (forceWalletVault) {
-            $('#pft-wallet-login').text('Save wallet on this browser');
+            $('.cp-page-title h1').text('Unlock Post Fiat wallet');
+            $('.pft-login-subtitle p').text(
+                'Unlock the wallet signer used for sharing and inbox access.'
+            );
+            $('.cp-login-instance').first().text('Wallet unlock');
+            $('#pft-wallet-login').text(alreadyLoggedIn ?
+                'Save and unlock wallet' : 'Save wallet on this browser');
             $('#pft-create-wallet').addClass('cp-hidden');
             $('#pft-show-legacy-login').parent().addClass('cp-hidden');
             $('#pft-legacy-login').addClass('cp-hidden');
@@ -146,6 +154,32 @@ define([
             }
             return Core;
         };
+        var redirectIfWalletSessionUnlocked = function () {
+            if (!redirectLoggedInWhenWalletUnlocked) { return Promise.resolve(false); }
+            var Core = getWalletCore(true);
+            if (!Core || typeof(Core.restoreSessionWallet) !== 'function') {
+                return Promise.resolve(false);
+            }
+            return Promise.resolve(Core.restoreSessionWallet()).then(function (session) {
+                if (session && session.mnemonic) {
+                    document.location.href = '/app/';
+                    return true;
+                }
+                if (typeof(Core.requestSessionWallet) !== 'function') {
+                    return false;
+                }
+                return Core.requestSessionWallet({ timeoutMs: 800 }).then(function (imported) {
+                    if (imported && imported.mnemonic) {
+                        document.location.href = '/app/';
+                        return true;
+                    }
+                    return false;
+                });
+            }).catch(function (err) {
+                console.error(err);
+                return false;
+            });
+        };
         var refreshSavedWallet = function () {
             var Core = getWalletCore(true);
             if (!Core || !Core.getSavedWalletMeta) { return; }
@@ -154,13 +188,28 @@ define([
                 if (!meta) {
                     $savedWallet.addClass('cp-hidden');
                     $savedWalletAddress.text('');
+                    if (forceWalletVault) {
+                        $seedLogin.removeClass('cp-hidden');
+                        $saveWalletRow.removeClass('cp-hidden');
+                        $seedActions.removeClass('cp-hidden');
+                    }
                     return;
                 }
                 $savedWallet.removeClass('cp-hidden');
                 $savedWalletAddress.text(meta.address);
+                if (forceWalletVault) {
+                    $seedLogin.addClass('cp-hidden');
+                    $saveWalletRow.addClass('cp-hidden');
+                    $seedActions.addClass('cp-hidden');
+                }
             } catch (err) {
                 console.error(err);
                 $savedWallet.addClass('cp-hidden');
+                if (forceWalletVault) {
+                    $seedLogin.removeClass('cp-hidden');
+                    $saveWalletRow.removeClass('cp-hidden');
+                    $seedActions.removeClass('cp-hidden');
+                }
             }
         };
         var refreshSavePassword = function () {
@@ -336,13 +385,18 @@ define([
         };
         refreshSavedWallet();
         refreshSavePassword();
-        if (!legacyDisabled && (!walletFirst || forceLegacyLogin)) {
-            $uname.focus();
-        } else if (!$savedWallet.hasClass('cp-hidden')) {
-            $walletPassword.focus();
-        } else {
-            $walletMnemonic.focus();
-        }
+        var focusDefault = function () {
+            if (!legacyDisabled && (!walletFirst || forceLegacyLogin)) {
+                $uname.focus();
+            } else if (!$savedWallet.hasClass('cp-hidden')) {
+                $walletPassword.focus();
+            } else {
+                $walletMnemonic.focus();
+            }
+        };
+        redirectIfWalletSessionUnlocked().then(function (redirecting) {
+            if (!redirecting) { focusDefault(); }
+        });
         $saveWallet.on('change', refreshSavePassword);
         $('#pft-create-wallet-button').click(createWallet);
         $('#pft-regenerate-wallet').click(createWallet);

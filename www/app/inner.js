@@ -163,6 +163,54 @@ define([
         });
     };
 
+    var openTopLevel = function (href) {
+        try {
+            window.top.location.href = href;
+            return;
+        } catch (err) {
+            console.error(err);
+        }
+        common.openURL(href);
+    };
+
+    var openWalletUnlock = function () {
+        openTopLevel('/login/#unlock-wallet');
+    };
+
+    var clearWalletSession = function () {
+        try {
+            var Core = getWalletCore();
+            if (typeof(Core.clearSessionWallet) === 'function') {
+                return Promise.resolve(Core.clearSessionWallet());
+            }
+        } catch (err) {
+            console.error(err);
+        }
+        return Promise.resolve();
+    };
+
+    var lockWalletSession = function () {
+        clearWalletSession().catch(function (err) {
+            console.error(err);
+        }).then(function () {
+            APP.wallet = null;
+            APP.walletStatus = 'Locked';
+            APP.settingsStatus = 'Wallet locked.';
+            UI.log('Post Fiat wallet locked.');
+            render();
+        });
+    };
+
+    var isWalletSessionError = function (err) {
+        return err && err.message === 'POSTFIAT_WALLET_SESSION_REQUIRED';
+    };
+
+    var handleWalletSessionRequired = function (message) {
+        APP.wallet = null;
+        APP.walletStatus = 'Locked';
+        UI.warn(message || 'Unlock your Post Fiat wallet first.');
+    };
+
     var getUsableHref = function (value) {
         var href = String(value || '');
         if (href.indexOf('#') === -1) { return ''; }
@@ -347,6 +395,12 @@ define([
             render();
         }).catch(function (err) {
             console.error(err);
+            if (isWalletSessionError(err)) {
+                handleWalletSessionRequired('Unlock your Post Fiat wallet before sharing.');
+                APP.shareStatus = 'Unlock your wallet first.';
+                render();
+                return;
+            }
             APP.shareStatus = err.message || 'Unable to send share.';
             render();
             UI.warn('Unable to send Post Fiat share.');
@@ -385,6 +439,12 @@ define([
             APP.inbox = [];
             APP.inboxLoaded = true;
             APP.inboxLoading = false;
+            if (isWalletSessionError(err)) {
+                handleWalletSessionRequired('Unlock your Post Fiat wallet to refresh shares.');
+                APP.inboxStatus = 'Unlock your wallet first.';
+                render();
+                return;
+            }
             APP.inboxStatus = err.message || 'Unable to refresh inbox.';
             render();
         });
@@ -430,6 +490,12 @@ define([
             render();
         }).catch(function (err) {
             console.error(err);
+            if (isWalletSessionError(err)) {
+                handleWalletSessionRequired('Unlock your Post Fiat wallet to copy your inbox.');
+                APP.settingsStatus = 'Unlock your wallet first.';
+                render();
+                return;
+            }
             APP.settingsStatus = err.message || 'Unable to build inbox.';
             render();
         });
@@ -462,6 +528,12 @@ define([
             render();
         }).catch(function (err) {
             console.error(err);
+            if (isWalletSessionError(err)) {
+                handleWalletSessionRequired('Unlock your Post Fiat wallet to publish your inbox.');
+                APP.settingsStatus = 'Unlock your wallet first.';
+                render();
+                return;
+            }
             APP.settingsStatus = err.message || 'Unable to publish inbox.';
             render();
         });
@@ -495,19 +567,17 @@ define([
             });
             return b;
         });
-        var lockButton = button('pft-icon-button', 'Lock', 'logout', { title: 'Lock wallet' });
-        $(lockButton).on('click', function () {
-            try {
-                var Core = getWalletCore();
-                if (Core.clearSessionWallet) {
-                    Core.clearSessionWallet().catch(function (err) {
-                        console.error(err);
-                    });
-                }
-            } catch (err) {
-                console.error(err);
+        var walletAction = APP.wallet ?
+            button('pft-secondary-button pft-wallet-action', 'Lock wallet', 'lock', { title: 'Lock wallet' }) :
+            button('pft-secondary-button pft-wallet-action', 'Unlock wallet', 'login', {
+                title: 'Unlock wallet'
+            });
+        $(walletAction).on('click', function () {
+            if (APP.wallet) {
+                lockWalletSession();
+                return;
             }
-            common.openURL('/logout/');
+            openWalletUnlock();
         });
         return h('div.pft-shell', [
             h('aside.pft-sidebar', [
@@ -541,7 +611,7 @@ define([
                         h('span.pft-wallet-address', shortAccount),
                         h('span.pft-wallet-state', APP.walletStatus)
                     ]),
-                    lockButton
+                    walletAction
                 ]),
                 h('main.pft-content', content)
             ]),
@@ -747,10 +817,12 @@ define([
         }, getPostFiatRelays().join('\n'));
         var copyInbox = button('pft-secondary-button', 'Copy inbox', 'copy');
         var publishInbox = button('pft-primary-button', 'Publish inbox', 'upload');
-        var loginVault = button('pft-secondary-button', 'Wallet vault', 'login');
+        var loginVault = button('pft-secondary-button', APP.wallet ? 'Wallet vault' : 'Unlock wallet', 'login');
         $(copyInbox).on('click', copyInboxDirectory);
         $(publishInbox).on('click', publishInboxDirectory);
-        $(loginVault).on('click', function () { common.openURL('/login/#wallet-vault'); });
+        $(loginVault).on('click', function () {
+            openTopLevel(APP.wallet ? '/login/#wallet-vault' : '/login/#unlock-wallet');
+        });
         return h('section.pft-view', [
             h('div.pft-view-header', [
                 h('div', [
@@ -853,7 +925,7 @@ define([
 
     var renderLoggedOut = function () {
         var login = button('pft-primary-button', 'Log in', 'login');
-        $(login).on('click', function () { common.openURL('/login/'); });
+        $(login).on('click', function () { openTopLevel('/login/'); });
         $('#cp-postfiat-app').empty().append(h('div.pft-login-required', [
             h('div.pft-brand-mark', 'PF'),
             h('h1', 'Post Fiat Docs'),
