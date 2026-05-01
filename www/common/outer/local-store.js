@@ -13,10 +13,6 @@ define([
     var LocalStore = {};
     var pftWalletSessionKey = 'PFT_wallet_session';
     var pftSessionWalletStorageKey = 'PFT_session_wallet';
-    var pftWalletSessionChannelName = 'PFT_wallet_session_channel';
-    var pftWalletSessionRequest = 'PFT_WALLET_SESSION_REQUEST';
-    var pftWalletSessionResponse = 'PFT_WALLET_SESSION_RESPONSE';
-    var pftWalletSessionRequestTimeout = 500;
     var pftWalletAddressPattern = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/;
     var walletSessionResponder;
 
@@ -94,62 +90,6 @@ define([
             isWalletAddress(localStorage[Constants.userNameKey]) &&
             typeof(localStorage[Constants.blockHashKey]) === 'string';
     };
-    var openWalletSessionChannel = function () {
-        if (typeof(window) === 'undefined' || typeof(window.BroadcastChannel) !== 'function') { return; }
-        try {
-            return new window.BroadcastChannel(pftWalletSessionChannelName);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-    var getWalletSessionPayload = function () {
-        var userName = sessionStorage[Constants.userNameKey];
-        var blockHash = sessionStorage[Constants.blockHashKey];
-        var payload = {};
-
-        if (!hasWalletSession()) { return; }
-        if (!isWalletAddress(userName) || typeof(blockHash) !== 'string' || !blockHash) { return; }
-
-        payload.version = 1;
-        payload.userName = userName;
-        payload.blockHash = blockHash;
-        [
-            ['userHash', Constants.userHashKey],
-            ['sessionJWT', Constants.sessionJWT],
-            ['ssoSeed', Constants.ssoSeed],
-            ['token', Constants.tokenKey],
-        ].forEach(function (entry) {
-            var value = sessionStorage[entry[1]];
-            if (typeof(value) === 'string') {
-                payload[entry[0]] = value;
-            }
-        });
-        return payload;
-    };
-    var importWalletSessionPayload = function (payload) {
-        if (!payload || typeof(payload) !== 'object') { return false; }
-        if (!isWalletAddress(payload.userName)) { return false; }
-        if (typeof(payload.blockHash) !== 'string' || !payload.blockHash) { return false; }
-
-        removeLocalLogin();
-        removeWalletLoginSession();
-        removeMismatchedSessionWallet(payload.userName);
-        safeSessionSet(pftWalletSessionKey, '1');
-        safeSessionSet(Constants.userNameKey, payload.userName);
-        safeSessionSet(Constants.blockHashKey, payload.blockHash);
-        [
-            ['userHash', Constants.userHashKey],
-            ['sessionJWT', Constants.sessionJWT],
-            ['ssoSeed', Constants.ssoSeed],
-            ['token', Constants.tokenKey],
-        ].forEach(function (entry) {
-            var value = payload[entry[0]];
-            if (typeof(value) === 'string') {
-                safeSessionSet(entry[1], value);
-            }
-        });
-        return true;
-    };
     var stopWalletSessionResponder = function () {
         if (!walletSessionResponder) { return; }
         try {
@@ -160,27 +100,8 @@ define([
         walletSessionResponder = undefined;
     };
     var startWalletSessionResponder = function () {
-        if (walletSessionResponder || !hasWalletSession()) { return; }
-        var channel = openWalletSessionChannel();
-        if (!channel) { return; }
-        walletSessionResponder = channel;
-        channel.onmessage = function (event) {
-            var data = event && event.data;
-            var payload;
-
-            if (!data || data.type !== pftWalletSessionRequest || !data.requestId) { return; }
-            payload = getWalletSessionPayload();
-            if (!payload) { return; }
-            try {
-                channel.postMessage({
-                    type: pftWalletSessionResponse,
-                    requestId: data.requestId,
-                    payload: payload,
-                });
-            } catch (err) {
-                console.error(err);
-            }
-        };
+        stopWalletSessionResponder();
+        return false;
     };
 
     LocalStore.setThumbnail = function (key, value, cb) {
@@ -283,55 +204,15 @@ define([
         return hasWalletSession();
     };
     LocalStore.exportWalletSession = function () {
-        return getWalletSessionPayload();
+        return;
     };
-    LocalStore.importWalletSession = function (payload) {
-        var imported = importWalletSessionPayload(payload);
-        if (imported) { startWalletSessionResponder(); }
-        return imported;
+    LocalStore.importWalletSession = function () {
+        return false;
     };
-    LocalStore.requestWalletSession = function (cb, timeout) {
-        var channel;
-        var timer;
-        var requestId;
-        var done;
-
+    LocalStore.requestWalletSession = function (cb) {
         cb = Util.once(cb || function () {});
         if (hasWalletSession()) { return void cb(true); }
-
-        channel = openWalletSessionChannel();
-        if (!channel) { return void cb(false); }
-
-        requestId = String(Date.now()) + String(Math.random()).slice(2);
-        done = function (imported) {
-            clearTimeout(timer);
-            try {
-                channel.close();
-            } catch (err) {
-                console.error(err);
-            }
-            cb(Boolean(imported));
-        };
-        channel.onmessage = function (event) {
-            var data = event && event.data;
-
-            if (!data || data.type !== pftWalletSessionResponse) { return; }
-            if (data.requestId !== requestId) { return; }
-            done(LocalStore.importWalletSession(data.payload));
-        };
-        timer = setTimeout(function () {
-            done(false);
-        }, typeof(timeout) === 'number' ? timeout : pftWalletSessionRequestTimeout);
-
-        try {
-            channel.postMessage({
-                type: pftWalletSessionRequest,
-                requestId: requestId,
-            });
-        } catch (err) {
-            console.error(err);
-            done(false);
-        }
+        cb(false);
     };
 
     LocalStore.isLoggedIn = function () {

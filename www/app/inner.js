@@ -41,6 +41,8 @@ define([
         shareStatus: '',
         inboxStatus: '',
         settingsStatus: '',
+        walletUnlockStatus: '',
+        walletUnlocking: false,
         search: '',
         driveLoaded: false,
         inboxLoaded: false,
@@ -123,6 +125,17 @@ define([
             }, { timeout: timeout || 30000 });
         });
     };
+    var runWalletShareAction = function (action, data, timeout) {
+        return queryOuter('Q_POSTFIAT_WALLET_SHARE', {
+            action: action,
+            data: data || {}
+        }, timeout || 30000).then(function (obj) {
+            if (!obj || !obj.state) {
+                throw new Error(obj && obj.error || 'POSTFIAT_WALLET_SESSION_REQUIRED');
+            }
+            return obj.result;
+        });
+    };
 
     var getWalletCore = function () {
         var Core = window.PostFiatWalletCore;
@@ -131,24 +144,59 @@ define([
     };
 
     var requestOuterWalletSession = function () {
-        var Core = getWalletCore();
         return queryOuter('Q_POSTFIAT_WALLET_SESSION', null, 3000).then(function (obj) {
-            if (!obj || !obj.state || !obj.mnemonic) { return null; }
-            var wallet = Core.deriveWalletFromMnemonic(obj.mnemonic);
-            if (obj.wallet && obj.wallet.address && obj.wallet.address !== wallet.address) {
-                throw new Error('POSTFIAT_WALLET_SESSION_MISMATCH');
-            }
-            return Promise.resolve(Core.createSessionWallet(wallet.mnemonic)).then(function () {
-                if (typeof(Core.startSessionWalletResponder) === 'function') {
-                    Core.startSessionWalletResponder();
-                }
-                return {
-                    mnemonic: wallet.mnemonic,
-                    wallet: wallet
-                };
-            });
+            if (!obj || !obj.state || !obj.wallet) { return null; }
+            return {
+                wallet: obj.wallet
+            };
         }).catch(function (err) {
             console.error(err);
+            return null;
+        });
+    };
+
+    var getWalletUnlockErrorMessage = function (err) {
+        var code = err && err.message || String(err || '');
+        if (code === 'MISSING_WALLET_PASSWORD') { return 'Enter your wallet password.'; }
+        if (code === 'NO_SAVED_WALLET') { return 'No saved wallet exists on this browser.'; }
+        if (code === 'POSTFIAT_WALLET_ACCOUNT_MISMATCH') {
+            return 'Saved wallet does not match this workspace account.';
+        }
+        if (code === 'POSTFIAT_WALLET_CORE_UNAVAILABLE') {
+            return 'Post Fiat wallet code is unavailable.';
+        }
+        return 'Unable to unlock saved wallet.';
+    };
+
+    var unlockSavedWalletInline = function (password) {
+        if (!password) {
+            APP.walletUnlockStatus = getWalletUnlockErrorMessage(new Error('MISSING_WALLET_PASSWORD'));
+            render();
+            return Promise.resolve(null);
+        }
+        APP.walletUnlocking = true;
+        APP.walletUnlockStatus = 'Unlocking wallet...';
+        render();
+        return queryOuter('Q_POSTFIAT_WALLET_UNLOCK', {
+            password: password
+        }, 10000).then(function (obj) {
+            if (!obj || !obj.state || !obj.wallet) {
+                throw new Error(obj && obj.error || 'POSTFIAT_WALLET_SESSION_REQUIRED');
+            }
+            var session = setUnlockedWalletSession({ wallet: obj.wallet });
+            APP.walletUnlockStatus = 'Wallet unlocked.';
+            APP.walletUnlocking = false;
+            render();
+            return session;
+        }).catch(function (err) {
+            console.error(err);
+            APP.wallet = null;
+            APP.walletSession = null;
+            APP.walletStatus = 'Locked';
+            APP.walletUnlocking = false;
+            APP.walletUnlockStatus = getWalletUnlockErrorMessage(err);
+            UI.warn(APP.walletUnlockStatus);
+            render();
             return null;
         });
     };
@@ -166,10 +214,10 @@ define([
         var Core = getWalletCore();
         var accountName;
 
-        if (!session || !session.mnemonic) {
+        if (!session || (!session.mnemonic && !session.wallet)) {
             throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
         }
-        if (!session.wallet) {
+        if (!session.wallet && session.mnemonic) {
             session.wallet = Core.deriveWalletFromMnemonic(session.mnemonic);
         }
         accountName = getLoggedInWalletAccount();
@@ -188,25 +236,10 @@ define([
     };
 
     var getSessionWallet = function () {
-        var Core = getWalletCore();
-        if (APP.walletSession && APP.walletSession.mnemonic) {
+        if (APP.walletSession && APP.walletSession.wallet) {
             return Promise.resolve(setUnlockedWalletSession(APP.walletSession));
         }
-        return Promise.resolve().then(function () {
-            return Core.restoreSessionWallet();
-        }).catch(function (err) {
-            console.error(err);
-            return null;
-        }).then(function (session) {
-            if (session || typeof(Core.requestSessionWallet) !== 'function') { return session; }
-            return Core.requestSessionWallet({ timeoutMs: 1200 });
-        }).catch(function (err) {
-            console.error(err);
-            return null;
-        }).then(function (session) {
-            if (session) { return session; }
-            return requestOuterWalletSession();
-        }).then(function (session) {
+        return requestOuterWalletSession().then(function (session) {
             return setUnlockedWalletSession(session);
         });
     };
@@ -222,7 +255,8 @@ define([
     };
 
     var openWalletUnlock = function () {
-        openTopLevel('/login/#unlock-wallet');
+        APP.walletUnlockStatus = APP.walletUnlockStatus || 'Unlock your saved wallet here.';
+        setRoute('settings');
     };
 
     var clearWalletSession = function () {
@@ -251,6 +285,21 @@ define([
         });
     };
 
+    var switchWalletSession = function () {
+        APP.walletStatus = 'Logging out';
+        APP.walletUnlockStatus = '';
+        render();
+        queryOuter('Q_POSTFIAT_WALLET_SWITCH', null, 10000).catch(function (err) {
+            console.error(err);
+            return clearWalletSession();
+        }).then(function () {
+            APP.wallet = null;
+            APP.walletSession = null;
+            clearInboxDirectoryState();
+            openTopLevel('/login/');
+        });
+    };
+
     var isWalletSessionError = function (err) {
         return err && (
             err.message === 'POSTFIAT_WALLET_SESSION_REQUIRED' ||
@@ -274,6 +323,9 @@ define([
         var code = err && err.message;
         if (code === 'POSTFIAT_RECIPIENT_DIRECTORY_NOT_FOUND') {
             return 'Recipient wallet has not published a sharing inbox yet.';
+        }
+        if (code === 'POSTFIAT_RECIPIENT_DIRECTORY_INVALID') {
+            return 'Recipient sharing inbox is invalid. Ask them to publish it again.';
         }
         if (code === 'MISSING_NOSTR_RELAYS') {
             return 'Add at least one relay before sending.';
@@ -444,11 +496,6 @@ define([
     };
 
     var shareDocument = function () {
-        var ShareWorkflow = window.PostFiatPrivateShare;
-        if (!ShareWorkflow || typeof(ShareWorkflow.publishLivePadPrivateShare) !== 'function') {
-            UI.warn('Post Fiat sharing is unavailable.');
-            return;
-        }
         var doc = APP.shareDoc;
         var mode = $('[name="pft-share-mode"]:checked').val() || 'edit';
         var relayList = parseRelayInput($('#pft-share-relays').val());
@@ -461,12 +508,10 @@ define([
         }
         APP.shareStatus = 'Sending...';
         render();
-        getSessionWallet().then(function (session) {
+        getSessionWallet().then(function () {
             var recipient = parseRecipient(recipientText, relayList);
-            return ShareWorkflow.publishLivePadPrivateShare({
-                senderMnemonic: session.mnemonic,
+            return runWalletShareAction('PUBLISH_LIVE_PAD_PRIVATE_SHARE', {
                 recipientDirectory: recipient,
-                postFiatConfig: ApiConfig.postFiat,
                 fallbackRelays: relayList,
                 directoryRelays: relayList,
                 origin: common.getMetadataMgr().getPrivateData().origin || window.location.origin,
@@ -499,20 +544,13 @@ define([
     };
 
     var fetchInbox = function () {
-        var ShareWorkflow = window.PostFiatPrivateShare;
-        if (!ShareWorkflow || typeof(ShareWorkflow.fetchAndOpenLivePadPrivateShares) !== 'function') {
-            UI.warn('Post Fiat inbox is unavailable.');
-            return;
-        }
         var relayList = parseRelayInput($('#pft-inbox-relays').val() || getPostFiatRelays().join('\n'));
         APP.inboxLoading = true;
         APP.inboxStatus = 'Refreshing...';
         render();
-        getSessionWallet().then(function (session) {
-            return ShareWorkflow.fetchAndOpenLivePadPrivateShares({
-                recipientMnemonic: session.mnemonic,
+        getSessionWallet().then(function () {
+            return runWalletShareAction('FETCH_AND_OPEN_LIVE_PAD_PRIVATE_SHARES', {
                 relayUrls: relayList,
-                postFiatConfig: ApiConfig.postFiat,
                 fallbackRelays: relayList,
                 origin: common.getMetadataMgr().getPrivateData().origin || window.location.origin,
                 limit: 50,
@@ -562,18 +600,11 @@ define([
     };
 
     var copyInboxDirectory = function () {
-        var ShareWorkflow = window.PostFiatPrivateShare;
-        if (!ShareWorkflow || typeof(ShareWorkflow.buildOwnNostrInboxDirectory) !== 'function') {
-            UI.warn('Post Fiat sharing is unavailable.');
-            return;
-        }
         var relayList = parseRelayInput($('#pft-settings-relays').val() || getPostFiatRelays().join('\n'));
         APP.settingsStatus = 'Building inbox...';
         render();
-        getSessionWallet().then(function (session) {
-            return ShareWorkflow.buildOwnNostrInboxDirectory({
-                mnemonic: session.mnemonic,
-                postFiatConfig: ApiConfig.postFiat,
+        getSessionWallet().then(function () {
+            return runWalletShareAction('BUILD_OWN_NOSTR_INBOX_DIRECTORY', {
                 fallbackRelays: relayList,
                 origin: common.getMetadataMgr().getPrivateData().origin || window.location.origin
             });
@@ -601,21 +632,14 @@ define([
     };
 
     var publishInboxDirectory = function () {
-        var ShareWorkflow = window.PostFiatPrivateShare;
-        if (!ShareWorkflow || typeof(ShareWorkflow.publishOwnNostrInboxDirectory) !== 'function') {
-            UI.warn('Post Fiat sharing is unavailable.');
-            return;
-        }
         var relayList = parseRelayInput($('#pft-settings-relays').val() || getPostFiatRelays().join('\n'));
         APP.inboxDirectoryState = 'publishing';
         APP.inboxPublishedRelays = [];
         APP.inboxPublishFailures = [];
         APP.settingsStatus = 'Publishing inbox...';
         render();
-        getSessionWallet().then(function (session) {
-            return ShareWorkflow.publishOwnNostrInboxDirectory({
-                mnemonic: session.mnemonic,
-                postFiatConfig: ApiConfig.postFiat,
+        getSessionWallet().then(function () {
+            return runWalletShareAction('PUBLISH_OWN_NOSTR_INBOX_DIRECTORY', {
                 fallbackRelays: relayList,
                 relayUrls: relayList,
                 origin: common.getMetadataMgr().getPrivateData().origin || window.location.origin,
@@ -655,6 +679,36 @@ define([
             APP.settingsStatus = err.message || 'Unable to publish inbox.';
             render();
         });
+    };
+
+    var renderWalletUnlockPanel = function (className) {
+        var inputAttrs = {
+            type: 'password',
+            autocomplete: 'current-password',
+            placeholder: 'Wallet password'
+        };
+        var unlockAttrs = {};
+        if (APP.walletUnlocking) {
+            inputAttrs.disabled = 'disabled';
+            unlockAttrs.disabled = 'disabled';
+        }
+        var input = h('input.pft-input.pft-wallet-unlock-password', inputAttrs);
+        var unlock = button('pft-primary-button pft-wallet-unlock-submit',
+            APP.walletUnlocking ? 'Unlocking' : 'Unlock', 'login', unlockAttrs);
+        var form = h('form.pft-wallet-unlock-form' + (className ? '.' + className : ''), [
+            h('label.pft-label', 'Wallet unlock'),
+            h('div.pft-wallet-unlock-row', [input, unlock]),
+            APP.walletUnlockStatus ? h('div.pft-wallet-unlock-status', APP.walletUnlockStatus) : h('div')
+        ]);
+        $(form).on('submit', function (e) {
+            e.preventDefault();
+            unlockSavedWalletInline($(input).val());
+        });
+        $(unlock).on('click', function (e) {
+            e.preventDefault();
+            unlockSavedWalletInline($(input).val());
+        });
+        return form;
     };
 
     var renderShell = function (content, aside) {
@@ -697,6 +751,15 @@ define([
             }
             openWalletUnlock();
         });
+        var logoutButton = button('pft-secondary-button pft-sidebar-logout',
+            'Log out', 'logout', {
+                title: 'Log out and switch wallet'
+            });
+        $(logoutButton).on('click', switchWalletSession);
+        var sidebarFooter = [logoutButton];
+        if (!APP.wallet) {
+            sidebarFooter.unshift(renderWalletUnlockPanel('pft-sidebar-unlock'));
+        }
         return h('div.pft-shell', [
             h('aside.pft-sidebar', [
                 h('div.pft-brand', [
@@ -707,9 +770,7 @@ define([
                     ])
                 ]),
                 h('nav.pft-nav', nav),
-                h('div.pft-sidebar-footer', [
-                    h('a.pft-legacy-link', { href: '/drive/' }, 'Legacy Drive')
-                ])
+                h('div.pft-sidebar-footer', sidebarFooter)
             ]),
             h('div.pft-main', [
                 h('header.pft-topbar', [
@@ -952,11 +1013,11 @@ define([
         }, getPostFiatRelays().join('\n'));
         var copyInbox = button('pft-secondary-button', 'Copy inbox JSON', 'copy');
         var publishInbox = button('pft-primary-button', 'Publish inbox', 'upload');
-        var loginVault = button('pft-secondary-button', APP.wallet ? 'Wallet vault' : 'Unlock wallet', 'login');
+        var lockWallet = button('pft-secondary-button', 'Lock wallet', 'lock');
         $(copyInbox).on('click', copyInboxDirectory);
         $(publishInbox).on('click', publishInboxDirectory);
-        $(loginVault).on('click', function () {
-            openTopLevel(APP.wallet ? '/login/#wallet-vault' : '/login/#unlock-wallet');
+        $(lockWallet).on('click', function () {
+            lockWalletSession();
         });
         return h('section.pft-view', [
             h('div.pft-view-header', [
@@ -995,7 +1056,8 @@ define([
                     ]),
                     relayFailures.length ? h('div.pft-relay-failures.pft-mono',
                         relayFailures.join(' | ')) : '',
-                    h('div.pft-actions-row', [publishInbox, copyInbox, loginVault])
+                    APP.wallet ? h('div.pft-actions-row', [publishInbox, copyInbox, lockWallet]) :
+                        renderWalletUnlockPanel('pft-settings-unlock')
                 ])
             ])
         ]);

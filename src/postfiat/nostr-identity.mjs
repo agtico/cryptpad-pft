@@ -14,6 +14,7 @@ export const NOSTR_IDENTITY_VERSION = 1;
 export const DEFAULT_NOSTR_PURPOSE = 'cryptpad-private-sharing';
 export const NOSTR_INBOX_DIRECTORY_KIND = 'postfiat-nostr-inbox';
 export const NOSTR_INBOX_DIRECTORY_VERSION = 1;
+export const NOSTR_INBOX_DIRECTORY_PROOF_VERSION = 1;
 export const NOSTR_PUBLIC_KEY_HEX_LENGTH = 64;
 
 const textEncoder = new TextEncoder();
@@ -274,14 +275,120 @@ const normalizeCreatedAt = (createdAt) => {
     return date.toISOString();
 };
 
+const normalizeOptionalOrigin = (origin) =>
+    typeof origin === 'undefined' || origin === null || origin === '' ?
+        undefined : normalizeNostrOrigin(origin);
+
+const buildDirectoryProofPayload = ({
+    walletAddress,
+    publicKeyHex,
+    relays,
+    createdAt,
+    origin,
+} = {}) => {
+    assertWalletAddress(walletAddress);
+    const payload = {
+        domain: 'postfiat.cryptpad.nostr.inbox-directory',
+        version: NOSTR_INBOX_DIRECTORY_PROOF_VERSION,
+        walletAddress,
+        publicKeyHex: normalizeNostrPublicKeyHex(publicKeyHex),
+        relays: normalizeNostrRelayList(relays),
+        createdAt: normalizeCreatedAt(createdAt),
+    };
+    const normalizedOrigin = normalizeOptionalOrigin(origin);
+    if (normalizedOrigin) {
+        payload.origin = normalizedOrigin;
+    }
+    return payload;
+};
+
+export const buildNostrInboxDirectoryProofMessage = (record = {}) => [
+    `Post Fiat CryptPad Nostr Inbox Directory v${NOSTR_INBOX_DIRECTORY_PROOF_VERSION}`,
+    stableStringify(buildDirectoryProofPayload(record)),
+    'This signature authorizes this Nostr inbox for wallet-address document sharing.',
+    'It is not a transaction.',
+].join('\n');
+
+const normalizeNostrInboxDirectoryWalletProof = (proof) => {
+    if (!proof || typeof proof !== 'object') {
+        throw new Error('INVALID_NOSTR_DIRECTORY_WALLET_PROOF');
+    }
+    const normalized = {
+        version: Number.parseInt(String(proof.version), 10),
+        walletPublicKey: String(proof.walletPublicKey || proof.publicKey || '')
+            .trim().toUpperCase(),
+        signature: String(proof.signature || '').trim().toUpperCase(),
+    };
+    if (normalized.version !== NOSTR_INBOX_DIRECTORY_PROOF_VERSION ||
+            !normalized.walletPublicKey || !normalized.signature) {
+        throw new Error('INVALID_NOSTR_DIRECTORY_WALLET_PROOF');
+    }
+    if (proof.message) {
+        normalized.message = String(proof.message);
+    }
+    return normalized;
+};
+
+export const buildNostrInboxDirectoryWalletProof = ({
+    mnemonic,
+    walletAddress,
+    publicKeyHex,
+    relays,
+    createdAt,
+    origin,
+} = {}) => {
+    const message = buildNostrInboxDirectoryProofMessage({
+        walletAddress,
+        publicKeyHex,
+        relays,
+        createdAt,
+        origin,
+    });
+    const signed = signMessage(mnemonic, message);
+    if (signed.address !== walletAddress) {
+        throw new Error('NOSTR_DIRECTORY_WALLET_PROOF_ADDRESS_MISMATCH');
+    }
+    return {
+        version: NOSTR_INBOX_DIRECTORY_PROOF_VERSION,
+        walletPublicKey: signed.publicKey,
+        signature: signed.signature,
+        message,
+    };
+};
+
+export const verifyNostrInboxDirectoryWalletProof = (record = {}) => {
+    let proof;
+    try {
+        proof = normalizeNostrInboxDirectoryWalletProof(record.walletProof);
+    } catch (err) {
+        return false;
+    }
+    const expectedMessage = buildNostrInboxDirectoryProofMessage(record);
+    if (proof.message && proof.message !== expectedMessage) {
+        return false;
+    }
+    try {
+        return verifyMessage({
+            message: expectedMessage,
+            signature: proof.signature,
+            publicKey: proof.walletPublicKey,
+            address: record.walletAddress,
+        });
+    } catch (err) {
+        return false;
+    }
+};
+
 export const buildNostrInboxDirectoryRecord = ({
     walletAddress,
     publicKeyHex,
     relays,
     createdAt,
+    origin,
+    walletProof,
 } = {}) => {
     assertWalletAddress(walletAddress);
-    return {
+    const record = {
         kind: NOSTR_INBOX_DIRECTORY_KIND,
         version: NOSTR_INBOX_DIRECTORY_VERSION,
         walletAddress,
@@ -289,12 +396,20 @@ export const buildNostrInboxDirectoryRecord = ({
         relays: normalizeNostrRelayList(relays),
         createdAt: normalizeCreatedAt(createdAt),
     };
+    const normalizedOrigin = normalizeOptionalOrigin(origin);
+    if (normalizedOrigin) {
+        record.origin = normalizedOrigin;
+    }
+    if (walletProof) {
+        record.walletProof = normalizeNostrInboxDirectoryWalletProof(walletProof);
+    }
+    return record;
 };
 
 export const serializeNostrInboxDirectoryRecord = (record) =>
     stableStringify(buildNostrInboxDirectoryRecord(record));
 
-export const parseNostrInboxDirectoryRecord = (serialized) => {
+export const parseNostrInboxDirectoryRecord = (serialized, options = {}) => {
     const parsed = typeof serialized === 'string' ? JSON.parse(serialized) : serialized;
     if (!parsed || typeof parsed !== 'object') {
         throw new Error('INVALID_NOSTR_DIRECTORY_RECORD');
@@ -303,5 +418,10 @@ export const parseNostrInboxDirectoryRecord = (serialized) => {
         parsed.version !== NOSTR_INBOX_DIRECTORY_VERSION) {
         throw new Error('UNSUPPORTED_NOSTR_DIRECTORY_RECORD');
     }
-    return buildNostrInboxDirectoryRecord(parsed);
+    const record = buildNostrInboxDirectoryRecord(parsed);
+    if (options.requireWalletProof !== false &&
+            !verifyNostrInboxDirectoryWalletProof(record)) {
+        throw new Error('INVALID_NOSTR_DIRECTORY_WALLET_PROOF');
+    }
+    return record;
 };

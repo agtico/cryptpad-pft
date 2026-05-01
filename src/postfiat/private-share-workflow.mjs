@@ -7,6 +7,7 @@ import {
 } from './live-pad-share.mjs';
 import {
     buildNostrInboxDirectoryRecord,
+    buildNostrInboxDirectoryWalletProof,
     deriveNostrIdentityFromMnemonic,
     isWalletAddress,
     normalizeNostrPublicKeyHex,
@@ -65,7 +66,7 @@ export const normalizePrivateShareRecipient = (record) => {
         return parseNostrInboxDirectoryRecord(parsed);
     }
     if (parsed?.walletAddress && (parsed.publicKeyHex || parsed.pubkey)) {
-        return buildNostrInboxDirectoryRecord(parsed);
+        return parseNostrInboxDirectoryRecord(parsed);
     }
     if (parsed?.walletAddress && isWalletAddress(parsed.walletAddress)) {
         return { walletAddress: parsed.walletAddress };
@@ -115,11 +116,19 @@ export const buildSignedNostrInboxDirectoryEvent = async ({
         postFiatConfig,
         fallbackRelays,
     });
-    const directory = buildNostrInboxDirectoryRecord({
+    const directoryBase = buildNostrInboxDirectoryRecord({
         walletAddress: identity.walletAddress,
         publicKeyHex: identity.publicKeyHex,
         relays,
         createdAt,
+        origin,
+    });
+    const directory = buildNostrInboxDirectoryRecord({
+        ...directoryBase,
+        walletProof: buildNostrInboxDirectoryWalletProof({
+            mnemonic,
+            ...directoryBase,
+        }),
     });
     const event = signNostrEvent({
         kind: NOSTR_KIND_POSTFIAT_DIRECTORY,
@@ -217,6 +226,10 @@ export const resolvePrivateShareRecipient = async (record, options = {}) => {
         limit: options.directoryLimit,
     });
     if (!resolved.directories.length) {
+        if (resolved.failures.some((failure) =>
+                failure.error === 'INVALID_NOSTR_DIRECTORY_WALLET_PROOF')) {
+            throw new Error('POSTFIAT_RECIPIENT_DIRECTORY_INVALID');
+        }
         throw new Error('POSTFIAT_RECIPIENT_DIRECTORY_NOT_FOUND');
     }
     return resolved.directories[0].directory;
@@ -324,11 +337,19 @@ export const buildOwnNostrInboxDirectory = async ({
         postFiatConfig,
         fallbackRelays,
     });
-    return buildNostrInboxDirectoryRecord({
+    const directoryBase = buildNostrInboxDirectoryRecord({
         walletAddress: identity.walletAddress,
         publicKeyHex: identity.publicKeyHex,
         relays,
         createdAt,
+        origin,
+    });
+    return buildNostrInboxDirectoryRecord({
+        ...directoryBase,
+        walletProof: buildNostrInboxDirectoryWalletProof({
+            mnemonic,
+            ...directoryBase,
+        }),
     });
 };
 

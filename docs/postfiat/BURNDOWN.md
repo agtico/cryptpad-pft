@@ -124,6 +124,11 @@ Status values:
 
 ## Phase 7: Server And Deployment
 
+- [x] Prove a no-Cloudflare Tor onion deployment with separate main and sandbox origins.
+- [x] Deprecate Cloudflare Tunnel as the default public test/deployment path.
+- [x] Add repeatable onion dev runner and docs.
+- [x] Switch onion hosted testing off `DEV=1` so stable `?ver=` asset caching works over Tor.
+- [x] Add precompressed `.gz`/`.br` static asset generation for onion performance.
 - [ ] Decide whether Post Fiat APIs live in `lib/http-worker.js` or a separate module.
 - [~] Add environment config for Nostr relays, relay discovery, relay retention, and optional PFT-operated private relay defaults.
 - [~] Add environment config for PFTL RPC/WSS, network id, IPFS gateway, and pinning backend.
@@ -146,6 +151,8 @@ Status values:
 - [ ] Verify IPFS/PFTL publication is never the silent default for normal document sharing.
 - [ ] Verify revocation language in UI is accurate.
 - [ ] Review legacy CryptPad raw URL sharing for accidental primary exposure.
+- [ ] Add browser e2e coverage over the onion endpoint to catch CSP, SFrame, and websocket regressions.
+- [ ] Add a performance budget check for onion `/login/`, `/app/`, and first pad open with warm cache.
 
 ## Phase 9: Portability To `pftasks`
 
@@ -160,5 +167,6 @@ Status values:
 2. Add saved-wallet unlock, session lock, no silent cross-tab unlock, and drive recovery browser coverage.
 3. Add browser-level integration tests against a local or fake Nostr relay for share publish, inbox refresh, open, and save.
 4. Add browser e2e coverage for wallet-directory publish/fetch and share-by-wallet-address.
-5. Add committed browser screenshot coverage for the editor `Share to wallet` modal.
-6. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.
+5. Add browser e2e coverage through Tor SOCKS for `/login/`, `/app/`, and a live pad load.
+6. Add committed browser screenshot coverage for the editor `Share to wallet` modal.
+7. Keep PFTL/IPFS work behind explicit durable-publish UX and privacy warnings.

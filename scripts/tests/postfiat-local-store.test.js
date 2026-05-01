@@ -129,7 +129,7 @@ test('wallet login preserves an unlocked signer for the same wallet', () => {
     assert.equal(LocalStore.isWalletSession(), true);
 });
 
-test('wallet sessions can be exported and imported into a new tab', () => {
+test('wallet login capabilities are not exported into another tab', () => {
     const address = 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC';
     const source = loadLocalStore();
     const target = loadLocalStore();
@@ -141,22 +141,14 @@ test('wallet sessions can be exported and imported into a new tab', () => {
 
     const payload = source.LocalStore.exportWalletSession();
 
-    assert.deepEqual(JSON.parse(JSON.stringify(payload)), {
-        version: 1,
-        userName: address,
-        blockHash: 'wallet-block',
-        userHash: '/user/hash/',
-        sessionJWT: 'session-jwt',
-        ssoSeed: 'sso-seed',
-        token: 'login-token',
-    });
-    assert.equal(target.LocalStore.importWalletSession(payload), true);
-    assert.equal(target.LocalStore.isWalletSession(), true);
-    assert.equal(target.LocalStore.isLoggedIn(), true);
-    assert.equal(target.LocalStore.getAccountName(), address);
-    assert.equal(target.LocalStore.getBlockHash(), 'wallet-block');
-    assert.equal(target.LocalStore.getSessionToken(), 'session-jwt');
-    assert.equal(target.LocalStore.getSSOSeed(), 'sso-seed');
+    assert.equal(payload, undefined);
+    assert.equal(target.LocalStore.importWalletSession(payload), false);
+    assert.equal(target.LocalStore.isWalletSession(), false);
+    assert.equal(target.LocalStore.isLoggedIn(), false);
+    assert.equal(target.LocalStore.getAccountName(), undefined);
+    assert.equal(target.LocalStore.getBlockHash(), undefined);
+    assert.equal(target.LocalStore.getSessionToken(), undefined);
+    assert.equal(target.LocalStore.getSSOSeed(), undefined);
     assert.equal(target.localStorage[Constants.blockHashKey], undefined);
 });
 
@@ -170,7 +162,7 @@ test('wallet session imports reject non-wallet identities', () => {
     assert.equal(LocalStore.isLoggedIn(), false);
 });
 
-test('wallet session imports clear a stale signer for another wallet', () => {
+test('wallet session imports are disabled and do not mutate the current tab', () => {
     const { LocalStore, sessionStorage } = loadLocalStore();
 
     sessionStorage.PFT_session_wallet =
@@ -178,10 +170,13 @@ test('wallet session imports clear a stale signer for another wallet', () => {
     assert.equal(LocalStore.importWalletSession({
         userName: 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC',
         blockHash: 'wallet-block',
-    }), true);
+    }), false);
 
-    assert.equal(sessionStorage.PFT_session_wallet, undefined);
-    assert.equal(LocalStore.getAccountName(), 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+    assert.equal(
+        sessionStorage.PFT_session_wallet,
+        '{"version":1,"address":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"}'
+    );
+    assert.equal(LocalStore.getAccountName(), undefined);
 });
 
 test('password login clears wallet-only session state', () => {

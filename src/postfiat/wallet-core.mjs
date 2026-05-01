@@ -125,26 +125,6 @@ const defaultSessionKeyStore = {
 
 const getSessionKeyStore = (keyStore) => keyStore || defaultSessionKeyStore;
 
-const getBroadcastChannel = (BroadcastChannelImpl) => {
-    const Channel = BroadcastChannelImpl || globalThis.BroadcastChannel;
-    if (typeof Channel !== 'function') { return; }
-    return new Channel(SESSION_WALLET_CHANNEL_NAME);
-};
-
-const isBrowserRuntime = () => typeof window !== 'undefined' && typeof document !== 'undefined';
-
-const makeRequestId = () => {
-    const random = (() => {
-        try {
-            return Array.from(getCrypto().getRandomValues(new Uint8Array(8)))
-                .map((byte) => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
-        } catch (err) {
-            return String(Math.random()).slice(2);
-        }
-    })();
-    return `${Date.now()}:${random}`;
-};
-
 export const bytesToBase64 = (bytes) => {
     const normalized = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
     if (typeof btoa === 'function') {
@@ -471,117 +451,12 @@ export const clearSessionWallet = async (options = {}) => {
 };
 
 export const startSessionWalletResponder = (options = {}) => {
-    if (sessionWalletResponder) { return true; }
-
-    let channel;
-    try {
-        channel = getBroadcastChannel(options.BroadcastChannelImpl);
-    } catch (err) {
-        console.error(err);
-    }
-    if (!channel) { return false; }
-
-    sessionWalletResponder = channel;
-    channel.onmessage = async (event) => {
-        const data = event && event.data;
-        if (!data || data.type !== SESSION_WALLET_REQUEST || !data.requestId) { return; }
-
-        try {
-            const session = await restoreSessionWallet({
-                storage: options.storage,
-                keyStore: options.keyStore,
-            });
-            if (!session || !session.mnemonic) { return; }
-            channel.postMessage({
-                type: SESSION_WALLET_RESPONSE,
-                requestId: data.requestId,
-                payload: {
-                    version: 1,
-                    mnemonic: session.mnemonic,
-                    address: session.wallet.address,
-                    derivationPath: session.wallet.derivationPath,
-                },
-            });
-        } catch (err) {
-            console.error(err);
-        }
-    };
-    return true;
+    void options;
+    stopSessionWalletResponder();
+    return false;
 };
 
-export const requestSessionWallet = (options = {}) => new Promise((resolve) => {
-    let channel;
-    let timer;
-    let finished = false;
-    const timeoutMs = Number.isFinite(options.timeoutMs) ?
-        options.timeoutMs : SESSION_WALLET_REQUEST_TIMEOUT_MS;
-
-    const done = (session) => {
-        if (finished) { return; }
-        finished = true;
-        clearTimeout(timer);
-        if (channel) {
-            try {
-                channel.close();
-            } catch (err) {
-                console.error(err);
-            }
-        }
-        resolve(session || null);
-    };
-
-    try {
-        channel = getBroadcastChannel(options.BroadcastChannelImpl);
-    } catch (err) {
-        console.error(err);
-    }
-    if (!channel) {
-        done(null);
-        return;
-    }
-
-    const requestId = makeRequestId();
-    channel.onmessage = async (event) => {
-        const data = event && event.data;
-        if (!data || data.type !== SESSION_WALLET_RESPONSE || data.requestId !== requestId) {
-            return;
-        }
-        try {
-            const mnemonic = data.payload && data.payload.mnemonic;
-            const wallet = deriveWalletFromMnemonic(mnemonic);
-            if (data.payload.address && data.payload.address !== wallet.address) {
-                throw new Error('SESSION_WALLET_ADDRESS_MISMATCH');
-            }
-            await createSessionWallet(wallet.mnemonic, {
-                storage: options.storage,
-                keyStore: options.keyStore,
-                BroadcastChannelImpl: options.BroadcastChannelImpl,
-            });
-            if (options.startResponder !== false && isBrowserRuntime()) {
-                startSessionWalletResponder({
-                    storage: options.storage,
-                    keyStore: options.keyStore,
-                    BroadcastChannelImpl: options.BroadcastChannelImpl,
-                });
-            }
-            done({
-                mnemonic: wallet.mnemonic,
-                wallet,
-            });
-        } catch (err) {
-            console.error(err);
-            done(null);
-        }
-    };
-
-    timer = setTimeout(() => done(null), timeoutMs);
-    try {
-        channel.postMessage({
-            type: SESSION_WALLET_REQUEST,
-            requestId,
-        });
-    } catch (err) {
-        console.error(err);
-        done(null);
-    }
-});
+export const requestSessionWallet = (options = {}) => {
+    void options;
+    return Promise.resolve(null);
+};

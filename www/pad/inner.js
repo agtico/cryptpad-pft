@@ -361,6 +361,26 @@ define([
         framework._.toolbar.$drawer.append($helpMenuButton);
     };
 
+    var decodeUrlEntities = function (value) {
+        var textarea = document.createElement('textarea');
+        var previous = String(value || '');
+        for (var i = 0; i < 3; i++) {
+            textarea.innerHTML = previous;
+            if (textarea.value === previous) { break; }
+            previous = textarea.value;
+        }
+        return previous;
+    };
+
+    var hasUnsafeUrlProtocol = function (value) {
+        var normalized = decodeUrlEntities(value)
+            .replace(/[\u0000-\u001f\u007f\s]+/g, '')
+            .toLowerCase();
+        var match = /^([a-z][a-z0-9+.-]*):/u.exec(normalized);
+        if (!match) { return false; }
+        return ['javascript', 'vbscript', 'data', 'file'].indexOf(match[1]) !== -1;
+    };
+
     var mkDiffOptions = function(cursor, readOnly) {
         return {
             preDiffApply: function(info) {
@@ -370,17 +390,14 @@ define([
                     send scripts over the wire.
                 */
                 if (['addAttribute', 'modifyAttribute'].indexOf(info.diff.action) !== -1) {
-                    if (info.diff.name === 'href') {
-                        // console.log(info.diff);
-                        //var href = info.diff.newValue;
-
-                        // TODO normalize HTML entities
-                        if (/javascript *: */.test(info.diff.newValue)) {
-                            // TODO remove javascript: links
-                        }
+                    var attrName = String(info.diff.name || '').toLowerCase();
+                    if (['href', 'src', 'xlink:href'].indexOf(attrName) !== -1 &&
+                            hasUnsafeUrlProtocol(info.diff.newValue)) {
+                        console.log("Rejecting forbidden URL attribute with name (%s)", info.diff.name);
+                        return true;
                     }
 
-                    if (/^on/.test(info.diff.name)) {
+                    if (/^on/.test(attrName)) {
                         console.log("Rejecting forbidden element attribute with name (%s)", info.diff.name);
                         return true;
                     }

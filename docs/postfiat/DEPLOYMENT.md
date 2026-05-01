@@ -10,9 +10,45 @@ Run this as a CryptPad instance with Post Fiat defaults enabled:
 - legacy username/password login visible only for migration unless explicitly disabled;
 - normal private sharing routed through encrypted Nostr relay delivery;
 - PFTL/IPFS durable publishing kept behind explicit user action;
-- production traffic served over HTTPS with separate main and sandbox origins.
+- production traffic served through either Tor onion services or HTTPS with separate main and sandbox origins.
 
 Do not run production on a single origin. CryptPad's sandbox origin is part of its XSS containment model.
+
+Cloudflare Tunnel is deprecated as the default public testing/deployment path for this fork. It is easy to run, but it centralizes metadata and gives the instance a provider-owned URL. Prefer onion services for no-KYC/no-origin-IP access, or use a VPS/Caddy/WireGuard edge if you need normal browser clearnet access.
+
+## Onion Deployment
+
+Read `docs/postfiat/ONION_DEPLOYMENT.md` first.
+
+For local onion development:
+
+```sh
+npm run dev:onion
+```
+
+This creates two v3 onion services, one for `httpUnsafeOrigin` and one for `httpSafeOrigin`, writes the local gitignored `config/config.js`, and keeps CryptPad bound to localhost.
+
+For a manually managed Tor deployment, set:
+
+```js
+module.exports = {
+    httpUnsafeOrigin: 'http://main-address.onion',
+    httpSafeOrigin: 'http://sandbox-address.onion',
+    httpAddress: '127.0.0.1',
+    httpPort: 3200,
+    websocketPort: 3203,
+    logIP: false,
+    postFiat: {
+        walletFirst: true,
+        disableLegacyLogin: false,
+        nostr: {
+            privateRelays: ['wss://relay.example.com'],
+        },
+    },
+};
+```
+
+HTTP is acceptable for `.onion` origins because onion services provide authenticated encrypted transport. The main and sandbox origins must still be distinct.
 
 ## Minimal Docker Compose
 
@@ -55,8 +91,8 @@ PFTL/IPFS publication is not the default sharing mode. Durable publication can e
 
 ## Operational Checklist
 
-- Configure TLS and reverse proxy websocket traffic for `/cryptpad_websocket`.
-- Use distinct main and sandbox origins.
+- Configure Tor onion services or TLS and reverse proxy websocket traffic for `/cryptpad_websocket`.
+- Use distinct main and sandbox origins, even for onion services.
 - Set `logIP: false` unless there is a concrete legal requirement.
 - Configure PFT-operated or self-hosted Nostr relay defaults before enabling share-by-wallet-address for users.
 - Keep backups of `blob`, `block`, `data`, and `datastore`.

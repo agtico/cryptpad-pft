@@ -39,6 +39,7 @@ Implemented so far:
 - `www/common/postfiat-private-share-contacts.js`: encrypted-account saved recipients for private-share contacts.
 - `www/common/inner/share.js`: Post Fiat is now the primary share tab when `postFiat` config is present; it copies the current wallet inbox JSON and publishes live-pad gift wraps to relay(s).
 - `www/common/drive-ui.js`: Drive now has a first-pass "Shared with me" Post Fiat inbox button that fetches/decrypts relay gift wraps and lets users open or save received pad links.
+- `scripts/postfiat-onion-dev.sh`: repeatable user-local Tor onion runner for main/sandbox origins. `npm run dev:onion` starts Tor, writes gitignored `config/config.js`, and runs CryptPad on localhost.
 - `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, wallet session storage, key registry parsing, Nostr identity/directory records, NIP-44/NIP-59 wrapping, relay publish/fetch helpers, full private-share workflow, and live-pad share payloads.
 - `docs/postfiat/UX_SPEC.md`: target Post Fiat Docs product UX, including the `/app/` shell, document workspace, editor shell, share-to-wallet flow, inbox, contacts, durable publishing, mobile layout, and UX implementation burndown.
 
@@ -48,6 +49,7 @@ Architecture pivot to preserve privacy:
 - Nostr-style encrypted relay delivery should be the default document share/chat transport.
 - PFTL/IPFS should be an explicit durable publication/export path, not normal sharing.
 - Future Orchard/shielded PFTL work protects transaction metadata but does not by itself hide IPFS CIDs, pinning providers, gateway access, or durable pointer existence.
+- Cloudflare Tunnel is deprecated as the default public test path. Use Tor onion services for no-KYC/no-origin-IP access, or a VPS/Caddy/WireGuard edge for clearnet deployments with explicit trust tradeoffs.
 
 ## Do Not Re-Discover These First
 
@@ -67,11 +69,12 @@ Use these local repos as references:
 ## Recommended Implementation Order
 
 1. Add browser e2e coverage for wallet-first login, seed login, saved-wallet unlock, session lock, and drive recovery.
-2. Add browser-level integration tests against a local or fake Nostr relay, including the share-modal tab and Drive inbox.
-3. Add browser e2e coverage for wallet-directory publish/fetch and share-by-wallet-address.
-4. Start the UX migration with `/app/`: Post Fiat shell, wallet badge, document list, and redirect wallet login away from stock `/drive/`.
-5. Replace the modal-based share experience with the dedicated `Share to wallet` sheet from `docs/postfiat/UX_SPEC.md`.
-6. Keep PFTL/IPFS durable publishing behind explicit UX and privacy warnings.
+2. Add browser e2e coverage through Tor SOCKS for onion `/login/`, `/app/`, websocket connection, and a live pad load.
+3. Add browser-level integration tests against a local or fake Nostr relay, including the share-modal tab and Drive inbox.
+4. Add browser e2e coverage for wallet-directory publish/fetch and share-by-wallet-address.
+5. Start the UX migration with `/app/`: Post Fiat shell, wallet badge, document list, and redirect wallet login away from stock `/drive/`.
+6. Replace the modal-based share experience with the dedicated `Share to wallet` sheet from `docs/postfiat/UX_SPEC.md`.
+7. Keep PFTL/IPFS durable publishing behind explicit UX and privacy warnings.
 
 ## Key Technical Decisions Already Made
 
@@ -82,6 +85,7 @@ Use these local repos as references:
 - Canonical private share model is encrypted Nostr relay delivery of live-pad capability payloads.
 - Durable/publication share model is PFTL v3 ContentBlob/AccessManifest plus XRPL pointer memo, used only when the user explicitly chooses durable publication/export.
 - Raw CryptPad URL sharing should be legacy/advanced, not the main PFT UX.
+- Onion service deployment is the canonical privacy-preserving public access path. Cloudflare Tunnel is a temporary debugging fallback only.
 - IPFS/PFTL should not be the silent default because CIDs, pinning providers, gateways, timing, and retention can create a document activity trail even if payments are shielded.
 - Revocation requires file-key/content rotation.
 - Wallet login should not leave a persistent CryptPad `Block_hash` in `localStorage`; it should unlock the current browser session only.
@@ -110,4 +114,5 @@ Use these local repos as references:
 - Open a new same-origin `/drive/` tab while the first wallet tab is still unlocked and confirm it does not silently unlock.
 - Share a live pad to a second wallet through encrypted Nostr relay delivery.
 - Recipient decrypts the private inbox payload and opens/imports the pad.
+- Load `/login/` and at least one live pad through Tor SOCKS against the onion main/sandbox origins.
 - Durable PFTL/IPFS publication remains an explicit advanced flow with privacy warnings.

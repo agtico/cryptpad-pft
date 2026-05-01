@@ -8,6 +8,7 @@ import test from 'node:test';
 import {
     buildNostrDerivationMessage,
     buildNostrInboxDirectoryRecord,
+    buildNostrInboxDirectoryWalletProof,
     deriveNostrIdentityFromMnemonic,
     normalizeNostrRelayList,
     parseNostrInboxDirectoryRecord,
@@ -67,19 +68,45 @@ test('serializes Nostr inbox directory records canonically', () => {
         publicKeyHex: 'A'.repeat(64),
         relays: ['wss://relay.postfiat.example/', 'wss://relay.postfiat.example'],
         createdAt: '2026-04-30T00:00:00.000Z',
+        origin: ORIGIN,
+        walletProof: buildNostrInboxDirectoryWalletProof({
+            mnemonic: TEST_MNEMONIC,
+            walletAddress: TEST_ADDRESS,
+            publicKeyHex: 'A'.repeat(64),
+            relays: ['wss://relay.postfiat.example/', 'wss://relay.postfiat.example'],
+            createdAt: '2026-04-30T00:00:00.000Z',
+            origin: ORIGIN,
+        }),
     });
 
-    assert.deepEqual(record, {
-        kind: 'postfiat-nostr-inbox',
-        version: 1,
-        walletAddress: TEST_ADDRESS,
-        publicKeyHex: 'a'.repeat(64),
-        relays: ['wss://relay.postfiat.example'],
-        createdAt: '2026-04-30T00:00:00.000Z',
-    });
+    assert.equal(record.kind, 'postfiat-nostr-inbox');
+    assert.equal(record.version, 1);
+    assert.equal(record.walletAddress, TEST_ADDRESS);
+    assert.equal(record.publicKeyHex, 'a'.repeat(64));
+    assert.deepEqual(record.relays, ['wss://relay.postfiat.example']);
+    assert.equal(record.createdAt, '2026-04-30T00:00:00.000Z');
+    assert.equal(record.origin, ORIGIN);
+    assert.equal(record.walletProof.version, 1);
+    assert.equal(record.walletProof.walletPublicKey.length, 66);
+    assert.ok(record.walletProof.signature);
     assert.equal(
         serializeNostrInboxDirectoryRecord(record),
-        '{"createdAt":"2026-04-30T00:00:00.000Z","kind":"postfiat-nostr-inbox","publicKeyHex":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","relays":["wss://relay.postfiat.example"],"version":1,"walletAddress":"rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC"}'
+        stableSerializedDirectory(record)
     );
     assert.deepEqual(parseNostrInboxDirectoryRecord(record), record);
 });
+
+test('rejects wallet directory records without a wallet proof', () => {
+    const record = buildNostrInboxDirectoryRecord({
+        walletAddress: TEST_ADDRESS,
+        publicKeyHex: 'A'.repeat(64),
+        relays: ['wss://relay.postfiat.example/'],
+        createdAt: '2026-04-30T00:00:00.000Z',
+    });
+
+    assert.throws(() => parseNostrInboxDirectoryRecord(record), /INVALID_NOSTR_DIRECTORY_WALLET_PROOF/);
+});
+
+const stableSerializedDirectory = (record) => serializeNostrInboxDirectoryRecord(
+    JSON.parse(JSON.stringify(record))
+);

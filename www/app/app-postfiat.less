@@ -121,8 +121,45 @@ body.cp-app-postfiat {
 }
 
 .pft-sidebar-footer {
+    display: grid;
+    gap: 10px;
     margin-top: auto;
     padding-top: 16px;
+}
+
+.pft-sidebar-logout {
+    width: 100%;
+}
+
+.pft-sidebar-unlock {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 10px;
+    border: 1px solid #2a3c32;
+    border-radius: 8px;
+    background: #17221d;
+}
+
+.pft-sidebar-unlock .pft-label {
+    color: #d9e3de;
+}
+
+.pft-wallet-unlock-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.pft-wallet-unlock-row .pft-input {
+    min-width: 0;
+}
+
+.pft-wallet-unlock-status {
+    min-height: 17px;
+    color: #a6b3ac;
+    font-size: 12px;
+    line-height: 1.35;
 }
 
 .pft-legacy-link {
@@ -476,6 +513,12 @@ body.cp-app-postfiat {
     color: #4b5851;
     font-size: 12px;
     font-weight: 700;
+}
+
+.pft-settings-unlock {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
 }
 
 .pft-share-aside {

@@ -56,4 +56,13 @@ Fse.rmSync(oldComponentsPath, { recursive: true, force: true });
     const destination = Path.join(componentsPath, l);
     Fs.rmSync(destination, { recursive: true, force: true });
     Fs.cpSync(source, destination, { recursive: true });
+    if (l === "ckeditor") {
+        [
+            "samples",
+            Path.join("plugins", "codesnippet"),
+            Path.join("plugins", "codesnippetgeshi"),
+        ].forEach(p => {
+            Fs.rmSync(Path.join(destination, p), { recursive: true, force: true });
+        });
+    }
 });

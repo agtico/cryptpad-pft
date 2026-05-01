@@ -16,6 +16,7 @@ Build a modern, open-source CryptPad distribution that:
 - supports Task Node style 24-word seed phrase wallets,
 - optionally supports the existing MetaMask PFTL Snap flow,
 - makes document sharing wallet-native through PFTL/XRPL logic,
+- supports privacy-first Tor onion deployment without Cloudflare Tunnel,
 - can later be ported into `pftasks` or run as a standalone instance,
 - ships with a substantially better branded UI than stock CryptPad.
 
@@ -30,6 +31,7 @@ The fork now includes the first Post Fiat wallet login path:
 - Optional encrypted saved-wallet unlock using PBKDF2-SHA256/AES-GCM.
 - Session-only wallet login capability storage so a wallet login does not leave a persistent CryptPad `Block_hash` in browser `localStorage`.
 - Nostr private sharing bridge for live CryptPad pads, including wallet inbox directory publish/fetch and share-by-wallet-address.
+- Tor onion dev deployment with separate main/sandbox onion origins. Cloudflare Tunnel is deprecated as the default public test path.
 
 Read these first:
 
@@ -38,9 +40,12 @@ Read these first:
 - `docs/postfiat/BURNDOWN.md`
 - `docs/postfiat/AGENT_HANDOFF.md`
 - `docs/postfiat/DEPLOYMENT.md`
+- `docs/postfiat/ONION_DEPLOYMENT.md`
 
 ## Key Recommendation
 
 Do not make CryptPad contacts or raw share URLs the canonical Post Fiat access model.
 
 The default private collaboration bridge is encrypted Nostr relay delivery of live CryptPad pad capabilities between PFT wallet-derived inboxes. PFTL/IPFS should be an explicit durable publication/export path with privacy warnings, not the silent default for normal sharing.
+
+For privacy-preserving public access, use Tor onion services as the default no-KYC path. Clearnet TLS deployments remain supported, but Cloudflare Tunnel should only be a temporary debugging tool with explicit metadata tradeoffs.

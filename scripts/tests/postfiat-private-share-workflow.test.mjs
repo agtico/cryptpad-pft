@@ -7,9 +7,11 @@ import test from 'node:test';
 
 import { hexToBytes } from '@noble/hashes/utils.js';
 
+import { signNostrEvent } from '../../src/postfiat/nostr-private-share.mjs';
 import {
     buildNostrInboxDirectoryRecord,
     deriveNostrIdentityFromMnemonic,
+    parseNostrInboxDirectoryRecord,
 } from '../../src/postfiat/nostr-identity.mjs';
 import {
     buildLivePadPrivateShare,
@@ -19,6 +21,7 @@ import {
     fetchNostrInboxDirectories,
     fetchAndOpenLivePadPrivateShares,
     normalizePrivateShareRecipient,
+    NOSTR_KIND_POSTFIAT_DIRECTORY,
     openLivePadPrivateShare,
     parseNostrInboxDirectoryEvent,
     publishOwnNostrInboxDirectory,
@@ -32,15 +35,13 @@ const RECIPIENT_MNEMONIC = 'legal winner thank year wave sausage worth useful le
 const ORIGIN = 'https://docs.postfiat.example';
 
 const makeRecipientDirectory = async (relays = ['wss://recipient-relay.example']) => {
-    const identity = await deriveNostrIdentityFromMnemonic(RECIPIENT_MNEMONIC, {
+    const built = await buildSignedNostrInboxDirectoryEvent({
+        mnemonic: RECIPIENT_MNEMONIC,
         origin: ORIGIN,
-    });
-    return buildNostrInboxDirectoryRecord({
-        walletAddress: identity.walletAddress,
-        publicKeyHex: identity.publicKeyHex,
-        relays,
+        relayUrls: relays,
         createdAt: '2026-04-30T00:00:00.000Z',
     });
+    return built.directory;
 };
 
 const createFakeWebSocket = ({ giftWrap, event, events } = {}) => {
@@ -123,6 +124,53 @@ test('publishes and resolves wallet Nostr inbox directory events', async () => {
         }
     );
     assert.deepEqual(resolved, builtDirectory.directory);
+});
+
+test('builds a wallet-proven inbox directory when createdAt is omitted', async () => {
+    const builtDirectory = await buildSignedNostrInboxDirectoryEvent({
+        mnemonic: RECIPIENT_MNEMONIC,
+        relayUrls: ['wss://directory-relay.example/'],
+        origin: ORIGIN,
+        eventCreatedAt: 1777564800,
+    });
+
+    assert.doesNotThrow(() => parseNostrInboxDirectoryEvent(builtDirectory.event));
+    assert.equal(
+        builtDirectory.directory.walletProof.message.includes(
+            `"createdAt":"${builtDirectory.directory.createdAt}"`
+        ),
+        true
+    );
+});
+
+test('rejects forged wallet directory events without wallet proof', async () => {
+    const attacker = await deriveNostrIdentityFromMnemonic(SENDER_MNEMONIC, {
+        origin: ORIGIN,
+    });
+    const forgedDirectory = buildNostrInboxDirectoryRecord({
+        walletAddress: 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV',
+        publicKeyHex: attacker.publicKeyHex,
+        relays: ['wss://attacker-relay.example'],
+        createdAt: '2026-04-30T00:00:00.000Z',
+    });
+
+    assert.throws(() => parseNostrInboxDirectoryRecord(forgedDirectory), /INVALID_NOSTR_DIRECTORY_WALLET_PROOF/);
+
+    const forgedEvent = signNostrEvent({
+        kind: NOSTR_KIND_POSTFIAT_DIRECTORY,
+        created_at: 1777564800,
+        tags: [
+            ['d', buildNostrInboxDirectoryDTag(forgedDirectory.walletAddress)],
+        ],
+        content: JSON.stringify(forgedDirectory),
+    }, attacker.privateKeyHex);
+    const { FakeWebSocket } = createFakeWebSocket({ event: forgedEvent });
+
+    await assert.rejects(resolvePrivateShareRecipient(forgedDirectory.walletAddress, {
+        relayUrls: ['wss://directory-relay.example/'],
+        WebSocketImpl: FakeWebSocket,
+        timeoutMs: 100,
+    }), /POSTFIAT_RECIPIENT_DIRECTORY_INVALID/);
 });
 
 test('publishes own wallet directory to relays', async () => {
@@ -212,6 +260,9 @@ test('builds an own inbox directory from the current wallet mnemonic', async () 
     assert.equal(directory.kind, 'postfiat-nostr-inbox');
     assert.equal(directory.walletAddress, 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV');
     assert.deepEqual(directory.relays, ['wss://private.example']);
+    assert.equal(directory.origin, ORIGIN);
+    assert.equal(directory.walletProof.version, 1);
+    assert.deepEqual(parseNostrInboxDirectoryRecord(directory), directory);
 });
 
 test('builds and opens a live-pad private share from PFT wallet mnemonics', async () => {

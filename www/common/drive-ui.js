@@ -3876,34 +3876,19 @@ define([
 
             return isPostFiatWalletAddress(accountName) ? accountName : '';
         };
-        var assertPostFiatSessionMatchesAccount = function (session) {
-            var Core = window.PostFiatWalletCore;
-            var accountName = getLoggedInPostFiatAccount();
+	        var assertPostFiatSessionMatchesAccount = function (session) {
+	            var accountName = getLoggedInPostFiatAccount();
 
-            if (!session || !session.mnemonic) { return session; }
-            if (!session.wallet) {
-                session.wallet = Core.deriveWalletFromMnemonic(session.mnemonic);
-            }
-            if (accountName && session.wallet.address !== accountName) {
-                if (Core && typeof(Core.clearSessionWallet) === 'function') {
-                    Promise.resolve(Core.clearSessionWallet()).catch(function (err) {
-                        console.error(err);
-                    });
-                }
-                throw new Error('POSTFIAT_WALLET_ACCOUNT_MISMATCH');
-            }
+	            if (accountName && session.wallet.address !== accountName) {
+	                throw new Error('POSTFIAT_WALLET_ACCOUNT_MISMATCH');
+	            }
             return session;
-        };
+	        };
 
-        var requestOuterPostFiatSessionWallet = function () {
-            var Core = window.PostFiatWalletCore;
-            if (!Core || typeof(Core.deriveWalletFromMnemonic) !== 'function' ||
-                    typeof(Core.createSessionWallet) !== 'function') {
-                return Promise.reject(new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE'));
-            }
-            if (!common || typeof(common.getSframeChannel) !== 'function') {
-                return Promise.resolve(null);
-            }
+	        var requestOuterPostFiatSessionWallet = function () {
+	            if (!common || typeof(common.getSframeChannel) !== 'function') {
+	                return Promise.resolve(null);
+	            }
             return new Promise(function (resolve, reject) {
                 var sframeChan = common.getSframeChannel();
                 if (!sframeChan || typeof(sframeChan.query) !== 'function') {
@@ -3916,52 +3901,51 @@ define([
                         resolve(null);
                         return;
                     }
-                    if (!obj || !obj.state || !obj.mnemonic) {
-                        if (obj && obj.error && obj.error !== 'POSTFIAT_WALLET_SESSION_REQUIRED') {
-                            reject(new Error(obj.error));
+	                    if (!obj || !obj.state || !obj.wallet) {
+	                        if (obj && obj.error && obj.error !== 'POSTFIAT_WALLET_SESSION_REQUIRED') {
+	                            reject(new Error(obj.error));
                             return;
                         }
                         resolve(null);
                         return;
                     }
-                    try {
-                        var wallet = Core.deriveWalletFromMnemonic(obj.mnemonic);
-                        if (obj.wallet && obj.wallet.address && obj.wallet.address !== wallet.address) {
-                            throw new Error('POSTFIAT_WALLET_SESSION_MISMATCH');
-                        }
-                        Promise.resolve(Core.createSessionWallet(wallet.mnemonic)).then(function () {
-                            if (typeof(Core.startSessionWalletResponder) === 'function') {
-                                Core.startSessionWalletResponder();
-                            }
-                            resolve({
-                                mnemonic: wallet.mnemonic,
-                                wallet: wallet
-                            });
-                        }).catch(reject);
-                    } catch (e) {
-                        reject(e);
-                    }
-                }, { timeout: 3000 });
-            });
-        };
+	                    resolve({
+	                        wallet: obj.wallet
+	                    });
+	                }, { timeout: 3000 });
+	            });
+	        };
 
-        var getPostFiatSessionWallet = async function () {
-            var Core = window.PostFiatWalletCore;
-            if (!Core || typeof(Core.restoreSessionWallet) !== 'function') {
-                throw new Error('POSTFIAT_WALLET_CORE_UNAVAILABLE');
-            }
-            var session = await Core.restoreSessionWallet();
-            if (!session && typeof(Core.requestSessionWallet) === 'function') {
-                session = await Core.requestSessionWallet({ timeoutMs: 1200 });
-            }
-            if (!session) {
-                session = await requestOuterPostFiatSessionWallet();
-            }
-            if (!session || !session.mnemonic) {
-                throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
-            }
-            return assertPostFiatSessionMatchesAccount(session);
-        };
+	        var getPostFiatSessionWallet = async function () {
+	            var session = await requestOuterPostFiatSessionWallet();
+	            if (!session || !session.wallet) {
+	                throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
+	            }
+	            return assertPostFiatSessionMatchesAccount(session);
+	        };
+	        var runPostFiatWalletShareAction = function (action, data, timeout) {
+	            return new Promise(function (resolve, reject) {
+	                var sframeChan = common && common.getSframeChannel && common.getSframeChannel();
+	                if (!sframeChan || typeof(sframeChan.query) !== 'function') {
+	                    reject(new Error('POSTFIAT_WALLET_SESSION_REQUIRED'));
+	                    return;
+	                }
+	                sframeChan.query('Q_POSTFIAT_WALLET_SHARE', {
+	                    action: action,
+	                    data: data || {}
+	                }, function (err, obj) {
+	                    if (err) {
+	                        reject(new Error(err));
+	                        return;
+	                    }
+	                    if (!obj || !obj.state) {
+	                        reject(new Error(obj && obj.error || 'POSTFIAT_WALLET_SESSION_REQUIRED'));
+	                        return;
+	                    }
+	                    resolve(obj.result);
+	                }, { timeout: timeout || 30000 });
+	            });
+	        };
 
         var getPostFiatPayloadHref = function (payload) {
             return Hash.getRelativeHref(payload && payload.href) || (payload && payload.href);
@@ -3994,11 +3978,10 @@ define([
                 UI.log(Messages.saved);
                 refresh();
             });
-        };
+	        };
 
-        var openPostFiatInboxModal = function () {
-            var ShareWorkflow = window.PostFiatPrivateShare;
-            var relays = getPostFiatRelays();
+	        var openPostFiatInboxModal = function () {
+	            var relays = getPostFiatRelays();
             var relayInput = h('textarea.form-control#cp-drive-pft-inbox-relays', {
                 rows: 2,
                 spellcheck: false,
@@ -4075,20 +4058,13 @@ define([
                 });
             };
             var fetchInbox = function () {
-                if (!ShareWorkflow ||
-                        typeof(ShareWorkflow.fetchAndOpenLivePadPrivateShares) !== 'function') {
-                    UI.warn('Post Fiat private sharing code is unavailable.');
-                    return true;
-                }
-                var relayList = parsePostFiatRelayInput($(relayInput).val());
+	                var relayList = parsePostFiatRelayInput($(relayInput).val());
                 setStatus('Refreshing...');
-                getPostFiatSessionWallet().then(function (session) {
-                    return ShareWorkflow.fetchAndOpenLivePadPrivateShares({
-                        recipientMnemonic: session.mnemonic,
-                        relayUrls: relayList,
-                        postFiatConfig: ApiConfig.postFiat,
-                        fallbackRelays: relayList,
-                        origin: metadataMgr.getPrivateData().origin || window.location.origin,
+	                getPostFiatSessionWallet().then(function () {
+	                    return runPostFiatWalletShareAction('FETCH_AND_OPEN_LIVE_PAD_PRIVATE_SHARES', {
+	                        relayUrls: relayList,
+	                        fallbackRelays: relayList,
+	                        origin: metadataMgr.getPrivateData().origin || window.location.origin,
                         limit: 50,
                         timeoutMs: 10000
                     });

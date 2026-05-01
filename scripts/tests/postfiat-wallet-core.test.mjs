@@ -217,7 +217,7 @@ test('missing session records do not delete the shared session wallet key', asyn
     assert.equal(restored.wallet.address, TEST_ADDRESS);
 });
 
-test('imports an unlocked wallet session from another browser context', async () => {
+test('does not export unlocked wallet seeds across browser contexts', async () => {
     const sourceStorage = makeStorage();
     const sourceKeyStore = makeKeyStore();
     const targetStorage = makeStorage();
@@ -234,7 +234,7 @@ test('imports an unlocked wallet session from another browser context', async ()
         storage: sourceStorage,
         keyStore: sourceKeyStore,
         BroadcastChannelImpl,
-    }), true);
+    }), false);
 
     try {
         const imported = await requestSessionWallet({
@@ -245,16 +245,8 @@ test('imports an unlocked wallet session from another browser context', async ()
             startResponder: false,
         });
 
-        assert.equal(imported.mnemonic, TEST_MNEMONIC);
-        assert.equal(imported.wallet.address, TEST_ADDRESS);
-        assert.ok(targetStorage.getItem(SESSION_WALLET_STORAGE_KEY));
-
-        const restored = await restoreSessionWallet({
-            storage: targetStorage,
-            keyStore: targetKeyStore,
-        });
-        assert.equal(restored.mnemonic, TEST_MNEMONIC);
-        assert.equal(restored.wallet.address, TEST_ADDRESS);
+        assert.equal(imported, null);
+        assert.equal(targetStorage.getItem(SESSION_WALLET_STORAGE_KEY), null);
     } finally {
         stopSessionWalletResponder();
     }
