@@ -126,6 +126,8 @@ define([
         var $saveWalletRow = $('#pft-save-wallet-row');
         var $savedWallet = $('#pft-saved-wallet');
         var $savedWalletAddress = $('#pft-saved-wallet-address');
+        var $sessionWallet = $('#pft-session-wallet');
+        var $sessionWalletStatus = $('#pft-session-wallet-status');
         var $seedLogin = $('#pft-seed-login');
         var $seedActions = $('#pft-seed-actions');
         var $generatedWallet = $('#pft-generated-wallet');
@@ -180,6 +182,39 @@ define([
                 return false;
             });
         };
+        var setSeedRecoveryVisible = function (visible) {
+            if (visible) {
+                $seedLogin.removeClass('cp-hidden');
+                $saveWalletRow.removeClass('cp-hidden');
+                $seedActions.removeClass('cp-hidden');
+                return;
+            }
+            $seedLogin.addClass('cp-hidden');
+            $saveWalletRow.addClass('cp-hidden');
+            $seedActions.addClass('cp-hidden');
+        };
+        var refreshWalletSeedButton = function () {
+            if (!forceWalletVault) { return; }
+            $('#pft-wallet-login').text($saveWallet[0].checked ?
+                'Save and unlock wallet' : 'Unlock once with seed');
+        };
+        var getExistingWalletSession = function (Core, timeoutMs) {
+            if (!Core || typeof(Core.restoreSessionWallet) !== 'function') {
+                return Promise.resolve(null);
+            }
+            return Promise.resolve(Core.restoreSessionWallet()).then(function (session) {
+                if (session || typeof(Core.requestSessionWallet) !== 'function') {
+                    return session;
+                }
+                return Core.requestSessionWallet({ timeoutMs: timeoutMs || 1500 });
+            });
+        };
+        var assertWalletMatchesAccount = function (wallet) {
+            var accountName = LocalStore.getAccountName && LocalStore.getAccountName();
+            if (accountName && wallet && wallet.address && accountName !== wallet.address) {
+                throw new Error('WALLET_ACCOUNT_MISMATCH');
+            }
+        };
         var refreshSavedWallet = function () {
             var Core = getWalletCore(true);
             if (!Core || !Core.getSavedWalletMeta) { return; }
@@ -189,26 +224,31 @@ define([
                     $savedWallet.addClass('cp-hidden');
                     $savedWalletAddress.text('');
                     if (forceWalletVault) {
-                        $seedLogin.removeClass('cp-hidden');
-                        $saveWalletRow.removeClass('cp-hidden');
-                        $seedActions.removeClass('cp-hidden');
+                        $sessionWallet.removeClass('cp-hidden');
+                        $sessionWalletStatus.text('No saved wallet found on this browser.');
+                        $saveWallet.prop('checked', false).prop('disabled', false);
+                        setSeedRecoveryVisible(false);
+                        refreshWalletSeedButton();
                     }
                     return;
                 }
                 $savedWallet.removeClass('cp-hidden');
                 $savedWalletAddress.text(meta.address);
                 if (forceWalletVault) {
-                    $seedLogin.addClass('cp-hidden');
-                    $saveWalletRow.addClass('cp-hidden');
-                    $seedActions.addClass('cp-hidden');
+                    $sessionWallet.addClass('cp-hidden');
+                    $saveWallet.prop('checked', true).prop('disabled', true);
+                    setSeedRecoveryVisible(false);
+                    refreshWalletSeedButton();
                 }
             } catch (err) {
                 console.error(err);
                 $savedWallet.addClass('cp-hidden');
                 if (forceWalletVault) {
-                    $seedLogin.removeClass('cp-hidden');
-                    $saveWalletRow.removeClass('cp-hidden');
-                    $seedActions.removeClass('cp-hidden');
+                    $sessionWallet.removeClass('cp-hidden');
+                    $sessionWalletStatus.text('Unable to read the saved wallet on this browser.');
+                    $saveWallet.prop('checked', false).prop('disabled', false);
+                    setSeedRecoveryVisible(false);
+                    refreshWalletSeedButton();
                 }
             }
         };
@@ -227,6 +267,40 @@ define([
                     Core.startSessionWalletResponder();
                 }
             });
+        };
+        var continueWithExistingSession = async function (options) {
+            options = options || {};
+            var Core = getWalletCore(!options.warn);
+            if (!Core) { return false; }
+            var showSessionPanel = forceWalletVault && $savedWallet.hasClass('cp-hidden');
+            if (showSessionPanel) {
+                $sessionWallet.removeClass('cp-hidden');
+                $sessionWalletStatus.text('Checking current wallet session...');
+            }
+            try {
+                var session = await getExistingWalletSession(Core, options.timeoutMs || 2500);
+                if (!session || !session.mnemonic) {
+                    throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
+                }
+                var wallet = session.wallet || Core.deriveWalletFromMnemonic(session.mnemonic);
+                assertWalletMatchesAccount(wallet);
+                await startWalletSession(Core, session.mnemonic);
+                document.location.href = '/app/';
+                return true;
+            } catch (err) {
+                console.error(err);
+                if (showSessionPanel) {
+                    $sessionWalletStatus.text('No unlocked wallet session is available.');
+                }
+                if (options.warn) {
+                    if (err.message === 'WALLET_ACCOUNT_MISMATCH') {
+                        UI.warn('The active wallet session does not match this account.');
+                    } else {
+                        UI.warn('No unlocked Post Fiat wallet session is available.');
+                    }
+                }
+                return false;
+            }
         };
         var redirectAfterWalletLogin = function (Core, mnemonic) {
             return function () {
@@ -275,20 +349,20 @@ define([
         };
         var saveWalletVaultOnly = async function (Core, mnemonic) {
             var wallet = Core.deriveWalletFromMnemonic(mnemonic);
-            var accountName = LocalStore.getAccountName && LocalStore.getAccountName();
             var savePassword = $savePassword.val();
 
-            if (accountName && accountName !== wallet.address) {
-                throw new Error('WALLET_ACCOUNT_MISMATCH');
-            }
-            if (!savePassword) {
+            assertWalletMatchesAccount(wallet);
+            if ($saveWallet[0].checked && !savePassword) {
                 throw new Error('MISSING_SAVE_PASSWORD');
             }
 
-            await Core.saveWallet(savePassword, wallet.mnemonic);
+            if ($saveWallet[0].checked) {
+                await Core.saveWallet(savePassword, wallet.mnemonic);
+            }
             await startWalletSession(Core, wallet.mnemonic);
             refreshSavedWallet();
-            UI.log('Post Fiat wallet saved on this browser.');
+            UI.log($saveWallet[0].checked ?
+                'Post Fiat wallet saved on this browser.' : 'Post Fiat wallet unlocked.');
             redirectAfterVaultSetup();
         };
         var createWallet = function () {
@@ -394,15 +468,37 @@ define([
                 $walletMnemonic.focus();
             }
         };
-        redirectIfWalletSessionUnlocked().then(function (redirecting) {
-            if (!redirecting) { focusDefault(); }
+        var finishInitialWalletRouting = function () {
+            if (forceWalletVault && alreadyLoggedIn) {
+                continueWithExistingSession({ timeoutMs: 2000 }).then(function (redirecting) {
+                    if (!redirecting) { focusDefault(); }
+                });
+                return;
+            }
+            redirectIfWalletSessionUnlocked().then(function (redirecting) {
+                if (!redirecting) { focusDefault(); }
+            });
+        };
+        finishInitialWalletRouting();
+        $saveWallet.on('change', function () {
+            refreshSavePassword();
+            refreshWalletSeedButton();
         });
-        $saveWallet.on('change', refreshSavePassword);
         $('#pft-create-wallet-button').click(createWallet);
         $('#pft-regenerate-wallet').click(createWallet);
         $('#pft-use-generated-wallet').click(generatedWalletLogin);
         $('#pft-wallet-login').click(walletLogin);
         $('#pft-unlock-wallet').click(savedWalletLogin);
+        $('#pft-use-session-wallet').click(function () {
+            continueWithExistingSession({ timeoutMs: 5000, warn: true });
+        });
+        $('#pft-recover-wallet').click(function () {
+            $sessionWallet.addClass('cp-hidden');
+            setSeedRecoveryVisible(true);
+            refreshSavePassword();
+            refreshWalletSeedButton();
+            $walletMnemonic.focus();
+        });
         $('#pft-forget-wallet').click(function () {
             var Core = getWalletCore();
             if (!Core) { return; }

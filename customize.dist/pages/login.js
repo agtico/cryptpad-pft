@@ -44,6 +44,7 @@ define([
             '#cp-main.pft-login-page #userForm{float:none;max-width:620px;margin:0 auto;padding:20px;border:1px solid #dbe3e4;border-radius:8px;background:#fff;box-shadow:0 18px 48px rgba(20,31,28,.12);}',
             '#cp-main.pft-login-page .cp-postfiat-wallet-login .cp-login-instance{margin-bottom:14px;color:#17201c;font-size:18px;font-weight:800;}',
             '#cp-main.pft-login-page .cp-postfiat-wallet-login .big-container{display:grid!important;grid-template-columns:1fr!important;gap:10px;}',
+            '#cp-main.pft-login-page #pft-session-wallet.cp-hidden,#cp-main.pft-login-page #pft-seed-login.cp-hidden,#cp-main.pft-login-page #pft-save-wallet-row.cp-hidden,#cp-main.pft-login-page #pft-seed-actions.cp-hidden{display:none!important;}',
             '#cp-main.pft-login-page .cp-postfiat-wallet-login .input-container{display:block!important;}',
             '#cp-main.pft-login-page .cp-postfiat-wallet-login .cp-default-label{display:block!important;margin-bottom:6px;color:#415049;font-size:12px;font-weight:700;}',
             '#cp-main.pft-login-page .cp-postfiat-wallet-login textarea.form-control,#cp-main.pft-login-page .cp-postfiat-wallet-login input.form-control,#cp-main.pft-login-page #pft-saved-wallet-address,#cp-main.pft-login-page #pft-generated-wallet-address{border:1px solid #ccd7da;border-radius:8px;background:#fff;box-shadow:none;}',
@@ -68,6 +69,17 @@ define([
                         h('div.cp-postfiat-wallet-login', [
                             h('div.cp-login-instance', forceWalletVault ?
                                 'Wallet unlock' : 'Post Fiat wallet'),
+                            h('div#pft-session-wallet.cp-hidden', [
+                                h('div#pft-session-wallet-status', 'Checking current wallet session...'),
+                                h('div.extra', [
+                                    h('button#pft-use-session-wallet.btn.btn-primary', {
+                                        type: 'button',
+                                    }, 'Continue with unlocked wallet'),
+                                    h('button#pft-recover-wallet.btn.btn-secondary', {
+                                        type: 'button',
+                                    }, 'Recover with seed'),
+                                ]),
+                            ]),
                             h('div#pft-saved-wallet.cp-hidden', [
                                 h('div.big-container', [
                                     h('div.input-container', [
